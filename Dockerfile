@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     libgl1 \
     wget \
+    gcc \
+    libcairo2-dev \
+    pkg-config \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
