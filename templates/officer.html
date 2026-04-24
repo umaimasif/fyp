@@ -47,8 +47,8 @@
             <p><strong>Vehicle Type:</strong> {{ result.vehicle }}</p>
             
             <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
-            <p><strong>Registered Owner:</strong> {{ result.owner_name }}</p>
-            <p><strong>Owner CNIC:</strong> {{ result.owner_nic }}</p>
+            <p><strong>Registered Owner:</strong> {{ result.owner_name or "Not Registered" }}</p>
+            <p><strong>Owner CNIC:</strong> {{ result.owner_nic or "N/A" }}</p>
             <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
 
             <p><strong>Violation:</strong> {{ result.type }}</p>
@@ -57,6 +57,11 @@
         </div>
         {% endif %}
 
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+            <a href="/" style="display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+                ← Citizen Portal
+            </a>
+        </div>
     </div>
 
 </body>
