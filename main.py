@@ -1,0 +1,379 @@
+import os
+import time
+import json
+import cv2
+import base64
+import numpy as np
+import re
+from datetime import datetime, UTC
+from fastapi import FastAPI, UploadFile, File, Request, Form
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
+from groq import Groq
+from xhtml2pdf import pisa
+from pymongo import MongoClient
+from twilio.rest import Client as TwilioClient
+from ultralytics import YOLO
+from pydantic import BaseModel
+
+# 1. Configuration & Client Setup
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+MONGO_URL = os.getenv("MONGO_URL")
+TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_NUM = os.getenv("TWILIO_PHONE_NUMBER")
+
+client = Groq(api_key=GROQ_API_KEY)
+
+# Robust MongoDB Connection
+try:
+    mongo_client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+    mongo_client.admin.command("ping")
+    print("✅ MongoDB connected successfully!")
+except Exception as e:
+    print(f"⚠️ WARNING: MongoDB connection failed: {e}")
+    mongo_client = None
+
+db = mongo_client["traffic_challan_system"] if mongo_client is not None else None
+challan_col = db["challans"] if db is not None else None
+owner_col = db["owners"] if db is not None else None
+
+# Twilio Setup
+twilio_client = None
+if TWILIO_SID and TWILIO_AUTH:
+    twilio_client = TwilioClient(TWILIO_SID, TWILIO_AUTH)
+else:
+    print("⚠️ WARNING: Twilio credentials not set. WhatsApp alerts disabled.")
+
+# --- DATA MODELS FOR FRONTEND ---
+class RegisterData(BaseModel):
+    name: str
+    phone: str
+    nic: str
+    password: str
+
+class LoginData(BaseModel):
+    nic: str
+    password: str
+
+# --- LOAD CUSTOM YOLO MODEL ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+yolo_model_path = os.path.join(BASE_DIR, "Numberplate.pt")
+
+try:
+    plate_model = YOLO(yolo_model_path)
+    print(f"✅ Loaded Custom Plate Model: {yolo_model_path}")
+except Exception as e:
+    print(f"⚠️ Error loading YOLO model: {e}")
+    plate_model = None
+
+app = FastAPI()
+
+# 2. Setup
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(TEMPLATES_DIR, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# 3. HELPER: Clean Text
+def clean_plate_text(text):
+    if not text or text == "UNKNOWN": return None
+    return re.sub(r'[^A-Z0-9]', '', text.upper())
+
+# 4. HELPER: Find Best Frame
+def extract_best_frame(video_path):
+    cap = cv2.VideoCapture(video_path)
+    max_conf = 0
+    best_frame_b64 = None
+    best_crop_b64 = None
+    frame_count = 0
+    
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success: break
+        frame_count += 1
+        if frame_count % 5 != 0: continue
+
+        if plate_model:
+            results = plate_model(frame, verbose=False)
+            for result in results:
+                for box in result.boxes:
+                    if int(box.cls[0]) == 0:
+                        conf = float(box.conf[0])
+                        if conf > max_conf:
+                            max_conf = conf
+                            _, buf = cv2.imencode(".jpg", frame)
+                            best_frame_b64 = base64.b64encode(buf).decode('utf-8')
+                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
+                            h, w, _ = frame.shape
+                            x1, y1, x2, y2 = max(0, x1-5), max(0, y1-5), min(w, x2+5), min(h, y2+5)
+                            crop = frame[y1:y2, x1:x2]
+                            if crop.size > 0:
+                                _, buf_crop = cv2.imencode(".jpg", crop)
+                                best_crop_b64 = base64.b64encode(buf_crop).decode('utf-8')
+    cap.release()
+    
+    if not best_frame_b64:
+        cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_MSEC, 1000)
+        success, frame = cap.read()
+        cap.release()
+        if success:
+            _, buf = cv2.imencode(".jpg", frame)
+            best_frame_b64 = base64.b64encode(buf).decode('utf-8')
+    return best_frame_b64, best_crop_b64
+
+
+# ==========================================
+# 5. API ROUTES
+# ==========================================
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
+
+@app.get("/officer", response_class=HTMLResponse)
+async def officer_page(request: Request):
+    return templates.TemplateResponse(request=request, name="officer.html")
+
+
+@app.post("/api/register")
+async def register_user(data: RegisterData):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    
+    existing = owner_col.find_one({"nic": data.nic})
+    
+    if existing:
+        owner_col.update_one(
+            {"nic": data.nic},
+            {"$set": {"name": data.name, "phone": data.phone, "password": data.password}}
+        )
+        vehicle_count = len(existing.get("vehicles", []))
+        return {"message": f"Account activated! Successfully fetched {vehicle_count} vehicle(s) from official database."}
+    else:
+        new_user = {
+            "name": data.name,
+            "phone": data.phone,
+            "nic": data.nic,
+            "password": data.password, 
+            "vehicles": [] 
+        }
+        owner_col.insert_one(new_user)
+        return {"message": "Account created, but no vehicles were found in the official database."}
+
+
+@app.post("/api/login")
+async def login_user(data: LoginData):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    user = owner_col.find_one({"nic": data.nic, "password": data.password})
+    if user:
+        return {"message": "Login successful!", "name": user.get("name", ""), "vehicles": user.get("vehicles", [])}
+    return JSONResponse(status_code=400, content={"message": "Invalid CNIC or Password."})
+
+
+@app.get("/api/my-challans/{nic}")
+async def get_my_challans(nic: str):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    user = owner_col.find_one({"nic": nic})
+    if not user:
+        return JSONResponse(status_code=404, content={"message": "User not found."})
+    
+    vehicles = user.get("vehicles", [])
+    challans = []
+    
+    if vehicles and challan_col is not None:
+        raw = list(challan_col.find({"vehicle_id": {"$in": vehicles}}))
+        for c in raw:
+            issued = c.get("issued_at", datetime.now(UTC))
+            challans.append({
+                "challan_number": c.get("challan_number", "N/A"),
+                "vehicle_id": c.get("vehicle_id", ""),
+                "violation_type": c.get("violation_type", ""),
+                "fine": c.get("fine", 0),
+                "status": c.get("status", "UNPAID"),
+                "issued_at": issued.strftime("%Y-%m-%d") if hasattr(issued, "strftime") else str(issued)
+            })
+    return {"challans": challans, "vehicles": vehicles, "name": user.get("name", "")}
+
+
+@app.get("/api/download-challan/{challan_number}")
+async def download_challan_citizen(challan_number: str):
+    """Generates a PDF for the citizen based on the challan number in the database."""
+    if challan_col is None or owner_col is None:
+        return HTMLResponse("Database unavailable.")
+
+    challan = challan_col.find_one({"challan_number": challan_number})
+    if not challan:
+        return HTMLResponse("Challan not found.")
+
+    owner = owner_col.find_one({"_id": challan["owner_id"]})
+    owner_name = owner.get("name", "Unknown") if owner else "Unknown"
+
+    issued_date = challan.get("issued_at")
+    date_str = issued_date.strftime("%Y-%m-%d") if hasattr(issued_date, "strftime") else str(issued_date)
+
+    challan_data = {
+        "challan_number": challan_number,
+        "owner_name": owner_name,
+        "type": challan.get("violation_type", ""),
+        "vehicle": challan.get("vehicle_id", ""),
+        "fine": challan.get("fine", 0),
+        "plate": challan.get("vehicle_id", ""),
+        "date": date_str,
+        "status": challan.get("status", "UNPAID")
+    }
+    
+    pdf_path = f"temp_{challan_number}.pdf"
+    html_content = templates.get_template("challan_template.html").render(challan_data)
+    
+    with open(pdf_path, "w+b") as f:
+        pisa.CreatePDF(html_content, dest=f)
+        
+    return FileResponse(pdf_path, filename=f"{challan_number}.pdf")
+
+
+@app.post("/process-video")
+async def process_video(request: Request, video: UploadFile = File(...)):
+    """AI Video Scanning Logic (Officer Portal)"""
+    video_path = f"temp_{video.filename}"
+    with open(video_path, "wb") as f:
+        f.write(await video.read())
+
+    try:
+        print("🔄 Scanning video...")
+        base64_full, base64_crop = extract_best_frame(video_path)
+        if not base64_full: raise Exception("Could not process video frames.")
+
+        violation_prompt = """
+        Analyze this traffic scene carefully.
+        1. Detect exactly ONE violation from this exact list and assign the correct fine:
+           - Helmet Violation (Fine: 1000)
+           - Phone Violation (Fine: 1000)
+           - Triple Riding (Fine: 2000)
+           - Seatbelt Violation (Fine: 3000)
+           - No Violation (Fine: 0)
+
+        2. Identify the Vehicle Type (e.g., Motorcycle, Car, SUV).
+        3. Read the License Plate text if visible (Fallback).
+        
+        Return ONLY JSON matching this exact structure. DO NOT INCLUDE IMAGE DATA: 
+        {
+          "violation_type": "string (MUST be from the list above)", 
+          "fine": number, 
+          "vehicle_type": "string (e.g., Motorcycle, Car)", 
+          "number_plate_fallback": "string" 
+        }
+        """
+        
+        completion_v = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": violation_prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_full}"}}
+            ]}],
+            response_format={"type": "json_object"}
+        )
+        violation_data = json.loads(completion_v.choices[0].message.content)
+
+        plate_text = "UNKNOWN"
+        if base64_crop:
+            print("✅ Precision Scan: Reading text from YOLO Crop.")
+            ocr_prompt = """
+            Read the alphanumeric LICENSE PLATE text from this cropped image.
+            Return JSON: {"number_plate": "string"}
+            Output ONLY the characters (e.g., "KHI1234"). DO NOT INCLUDE IMAGE DATA.
+            """
+            completion_ocr = client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text": ocr_prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_crop}"}}
+                ]}],
+                response_format={"type": "json_object"}
+            )
+            ocr_data = json.loads(completion_ocr.choices[0].message.content)
+            plate_text = ocr_data.get("number_plate", "UNKNOWN")
+
+        final_plate = clean_plate_text(plate_text)
+        if not final_plate:
+            fallback = clean_plate_text(violation_data.get("number_plate_fallback"))
+            if fallback:
+                final_plate = fallback
+            else:
+                final_plate = "UNKNOWN"
+
+        final_data = {
+            "type": violation_data.get("violation_type", "Unknown Violation"),
+            "fine": violation_data.get("fine", 0),
+            "vehicle": violation_data.get("vehicle_type", "Unknown Vehicle"),
+            "number_plate": final_plate,
+            "violation_image": base64_full,
+            "owner_name": "Unregistered Vehicle", 
+            "owner_nic": "N/A"                    
+        }
+
+        owner = None
+        if final_plate != "UNKNOWN" and owner_col is not None:
+            owner = owner_col.find_one({"vehicles": {"$regex": f"^{final_plate}$", "$options": "i"}})
+
+        if owner:
+            final_data["owner_name"] = owner.get("name", "Unknown")
+            final_data["owner_nic"] = owner.get("nic", "Unknown")
+
+            challan_no = f"CH-{int(time.time())}"
+            if challan_col is not None:
+                challan_col.insert_one({
+                    "challan_number": challan_no,
+                    "vehicle_id": final_plate,
+                    "owner_id": owner["_id"],
+                    "violation_type": final_data["type"],
+                    "fine": final_data["fine"],
+                    "status": "UNPAID",
+                    "issued_at": datetime.now(UTC)
+                })
+
+            msg = (
+                f"🚨 *TRAFFIC VIOLATION* 🚨\n\n"
+                f"Dear *{owner['name'].upper()}*,\n"
+                f"Vehicle: *{final_data['vehicle']}* ({final_plate})\n"
+                f"Violation: *{final_data['type']}*\n"
+                f"Fine: PKR {final_data['fine']}\n"
+                f"Please pay via App."
+            )
+            if twilio_client and TWILIO_NUM:
+                try:
+                    twilio_client.messages.create(
+                        from_=f"whatsapp:{TWILIO_NUM}",
+                        body=msg,
+                        to=f"whatsapp:+{owner['phone']}" # Added the '+' for Twilio formatting
+                    )
+                    final_data['notification_status'] = "WhatsApp Sent ✅"
+                except Exception as e:
+                    final_data['notification_status'] = f"WhatsApp Fail: {str(e)}"
+            else:
+                final_data['notification_status'] = "WhatsApp disabled (no Twilio credentials)"
+        else:
+            final_data['notification_status'] = f"Owner not found for {final_plate}"
+
+    except Exception as e:
+        return templates.TemplateResponse(request=request, name="officer.html", context={"error": str(e)})
+    finally:
+        if os.path.exists(video_path): os.remove(video_path)
+
+    return templates.TemplateResponse(request=request, name="officer.html", context={"result": final_data})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8001))
+    host = "0.0.0.0" if os.getenv("PORT") else "127.0.0.1"
+    uvicorn.run(app, host=host, port=port)

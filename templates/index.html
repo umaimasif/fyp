@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Portal - TrafficGuard</title>
+    <style>
+        :root { --primary-color: #4f46e5; --bg-color: #0f172a; --card-bg: #ffffff; --text-color: #334155; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--text-color); padding: 20px; }
+        .portal-container { background: var(--card-bg); width: 100%; max-width: 600px; padding: 2.5rem; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }
+        h1 { margin: 0; color: var(--primary-color); }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;}
+        input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        .btn-main { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        .btn-logout { background-color: #ef4444; margin-top: 20px; }
+        .hidden { display: none; }
+        .msg { padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none; font-size: 0.9rem; }
+        .success { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .switch-link { margin-top: 20px; font-size: 0.9rem; }
+        .switch-link span { color: var(--primary-color); cursor: pointer; text-decoration: underline; }
+        
+        .vehicle-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 20px; text-align: left; }
+        .vehicle-badge { display: inline-block; background: var(--primary-color); color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; margin-right: 10px; margin-top: 5px; border: 2px solid #312e81;}
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; text-align: left; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f8fafc; }
+        .status-unpaid { color: #dc2626; font-weight: bold; }
+        .status-paid { color: #166534; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="portal-container">
+        <h1>Citizen Portal</h1>
+        <p>Manage your vehicles and challans</p>
+        <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+        <div id="msg-box" class="msg"></div>
+
+        <div id="login-section">
+            <div class="form-group"><label>CNIC Number</label><input type="text" id="login-nic" placeholder="42201-1234567-1"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="login-pass"></div>
+            <button class="btn-main" onclick="handleLogin()">Log In</button>
+            <div class="switch-link">Not registered? <span onclick="toggleView('register-section')">Create Account</span></div>
+        </div>
+
+        <div id="register-section" class="hidden">
+            <div class="form-group"><label>Full Name</label><input type="text" id="reg-name"></div>
+            <div class="form-group"><label>Phone Number</label><input type="tel" id="reg-phone" placeholder="923001234567"></div>
+            <div class="form-group"><label>CNIC Number</label><input type="text" id="reg-nic" placeholder="42201-1234567-1"></div>
+            <div class="form-group"><label>Create Password</label><input type="password" id="reg-pass"></div>
+            <button class="btn-main" onclick="handleRegister()">Register</button>
+            <div class="switch-link">Have an account? <span onclick="toggleView('login-section')">Log In</span></div>
+        </div>
+
+        <div id="dashboard-section" class="hidden">
+            <h2 style="color: var(--primary-color);">Welcome, <span id="user-name-display"></span></h2>
+            
+            <div class="vehicle-box">
+                <h4 style="margin: 0 0 10px 0; color: var(--primary-color);">🚗 Officially Registered Vehicles</h4>
+                <div id="vehicle-list" style="margin-bottom: 5px;"></div>
+            </div>
+
+            <h3 style="text-align: left; margin-top: 25px;">Your Challans</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Challan #</th>
+                            <th>Vehicle</th>
+                            <th>Violation</th>
+                            <th>Fine</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="challan-table-body">
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="btn-main btn-logout" onclick="handleLogout()">Log Out</button>
+        </div>
+    </div>
+
+    <script>
+        const msgBox = document.getElementById('msg-box');
+        
+        window.onload = function() {
+            if (localStorage.getItem('userNic')) { loadDashboard(); }
+        };
+
+        function showMessage(msg, isError = false) {
+            msgBox.className = isError ? 'msg error' : 'msg success';
+            msgBox.innerText = msg;
+            msgBox.style.display = 'block';
+        }
+
+        function toggleView(sectionId) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('register-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById(sectionId).classList.remove('hidden');
+            msgBox.style.display = 'none';
+        }
+
+        async function handleRegister() {
+            const data = {
+                name: document.getElementById('reg-name').value,
+                phone: document.getElementById('reg-phone').value,
+                nic: document.getElementById('reg-nic').value,
+                password: document.getElementById('reg-pass').value
+            };
+            const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (res.ok) { 
+                showMessage(result.message); 
+                toggleView('login-section'); 
+            } else { 
+                showMessage(result.message, true); 
+            }
+        }
+
+        async function handleLogin() {
+            const nic = document.getElementById('login-nic').value;
+            const pass = document.getElementById('login-pass').value;
+            const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nic, password: pass}) });
+            const result = await res.json();
+            
+            if (res.ok) {
+                localStorage.setItem('userNic', nic);
+                localStorage.setItem('userName', result.name);
+                loadDashboard();
+            } else { showMessage(result.message, true); }
+        }
+
+        async function loadDashboard() {
+            toggleView('dashboard-section');
+            const nic = localStorage.getItem('userNic');
+            document.getElementById('user-name-display').innerText = localStorage.getItem('userName') || "Citizen";
+            
+            const res = await fetch(`/api/my-challans/${nic}`);
+            const data = await res.json();
+            
+            const vehicleList = document.getElementById('vehicle-list');
+            vehicleList.innerHTML = "";
+            if (data.vehicles && data.vehicles.length > 0) {
+                data.vehicles.forEach(v => {
+                    vehicleList.innerHTML += `<span class="vehicle-badge">${v}</span>`;
+                });
+            } else {
+                vehicleList.innerHTML = `<span style="color: #64748b; font-size: 0.9rem;">No vehicles found attached to this CNIC in the official database.</span>`;
+            }
+
+            const tbody = document.getElementById('challan-table-body');
+            tbody.innerHTML = ""; 
+            
+            if(data.challans && data.challans.length > 0) {
+                data.challans.forEach(c => {
+                    const statusClass = c.status === "UNPAID" ? "status-unpaid" : "status-paid";
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${c.challan_number}</td>
+                            <td><strong>${c.vehicle_id}</strong></td>
+                            <td>${c.violation_type}</td>
+                            <td>Rs ${c.fine}</td>
+                            <td class="${statusClass}">${c.status}</td>
+                            <td>
+                                <a href="/api/download-challan/${c.challan_number}" target="_blank" style="background: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 0.75rem; font-weight: bold; white-space: nowrap;">Download PDF</a>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No challans found for your vehicles. Great job!</td></tr>`;
+            }
+        }
+
+        function handleLogout() {
+            localStorage.clear();
+            document.getElementById('login-nic').value = '';
+            document.getElementById('login-pass').value = '';
+            toggleView('login-section');
+        }
+    </script>
+</body>
+</html>

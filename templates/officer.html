@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Officer Portal - TrafficGuard</title>
+    <style>
+        :root { --primary-color: #dc2626; --primary-hover: #b91c1c; --bg-color: #0f172a; --card-bg: #ffffff; --text-color: #334155;}
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px;}
+        .container { background: var(--card-bg); max-width: 450px; width: 100%; padding: 2.5rem; border-radius: 16px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        h1 { margin: 0; color: var(--primary-color); }
+        .form-group { margin-top: 20px; text-align: left; }
+        input[type="file"] { width: 100%; padding: 10px; border: 2px dashed #cbd5e1; border-radius: 8px; margin-bottom: 10px; }
+        .btn-main { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-main:hover { background-color: var(--primary-hover); }
+        .loading { display: none; color: var(--primary-color); font-weight: bold; margin-top: 15px; }
+        .result-box { background-color: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 20px; text-align: left; }
+        .result-box img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
+        .error { color: #dc2626; font-weight: bold; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Traffic Police Terminal</h1>
+        <p>AI Video Scanner</p>
+        <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+        <div class="form-group">
+            <label style="font-weight: bold;">Upload Dashcam/CCTV Video</label>
+            <form action="/process-video" method="POST" enctype="multipart/form-data" onsubmit="document.getElementById('loading').style.display='block';">
+                <input type="file" name="video" accept="video/*" required>
+                <button type="submit" class="btn-main">Scan For Violations</button>
+            </form>
+            <div id="loading" class="loading">🔄 AI is processing video...</div>
+        </div>
+
+        {% if error %}
+            <div class="error">⚠️ {{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <div class="result-box">
+            <h3 style="margin-top:0; color: #dc2626;">🚨 Violation Detected</h3>
+            <img src="data:image/jpeg;base64,{{ result.violation_image }}" alt="Violation Frame">
+            <p><strong>Plate:</strong> {{ result.number_plate }}</p>
+            <p><strong>Vehicle Type:</strong> {{ result.vehicle }}</p>
+            
+            <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
+            <p><strong>Registered Owner:</strong> {{ result.owner_name }}</p>
+            <p><strong>Owner CNIC:</strong> {{ result.owner_nic }}</p>
+            <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
+
+            <p><strong>Violation:</strong> {{ result.type }}</p>
+            <p><strong>Fine Amount:</strong> PKR {{ result.fine }}</p>
+            <p style="font-size: 0.8rem; color: #64748b;">System Log: {{ result.notification_status }}</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+</body>
+</html>

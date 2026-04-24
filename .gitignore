@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+challan.pdf
+temp_*
+server.log
+startup_test.log
+last/
+*.zip
+Numberplate.pt
