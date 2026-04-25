@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import random
 import cv2
 import base64
 import numpy as np
@@ -48,6 +49,8 @@ if TWILIO_SID and TWILIO_AUTH:
 else:
     print("⚠️ WARNING: Twilio credentials not set. WhatsApp alerts disabled.")
 
+otp_store = {}  # {nic: {"otp": "123456", "expires": unix_timestamp}}
+
 # --- DATA MODELS FOR FRONTEND ---
 class RegisterData(BaseModel):
     name: str
@@ -58,6 +61,18 @@ class RegisterData(BaseModel):
 class LoginData(BaseModel):
     nic: str
     password: str
+
+class RemoveVehicleData(BaseModel):
+    nic: str
+    vehicle_id: str
+
+class ForgotPasswordData(BaseModel):
+    nic: str
+
+class ResetPasswordData(BaseModel):
+    nic: str
+    otp: str
+    new_password: str
 
 # --- LOAD CUSTOM YOLO MODEL ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -317,8 +332,9 @@ async def process_video(request: Request, video: UploadFile = File(...)):
             "vehicle": violation_data.get("vehicle_type", "Unknown Vehicle"),
             "number_plate": final_plate,
             "violation_image": base64_full,
-            "owner_name": "Unregistered Vehicle", 
-            "owner_nic": "N/A"                    
+            "owner_name": "Unregistered Vehicle",
+            "owner_nic": "N/A",
+            "challan_number": None
         }
 
         owner = None
@@ -340,6 +356,7 @@ async def process_video(request: Request, video: UploadFile = File(...)):
                     "status": "UNPAID",
                     "issued_at": datetime.now(UTC)
                 })
+            final_data["challan_number"] = challan_no
 
             msg = (
                 f"🚨 *TRAFFIC VIOLATION* 🚨\n\n"
@@ -370,6 +387,127 @@ async def process_video(request: Request, video: UploadFile = File(...)):
         if os.path.exists(video_path): os.remove(video_path)
 
     return templates.TemplateResponse(request=request, name="officer.html", context={"result": final_data})
+
+
+# ==========================================
+# 6. FEATURE ENDPOINTS
+# ==========================================
+
+@app.patch("/api/challan/{challan_number}/pay")
+async def mark_challan_paid(challan_number: str):
+    if challan_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    result = challan_col.update_one({"challan_number": challan_number}, {"$set": {"status": "PAID"}})
+    if result.matched_count == 0:
+        return JSONResponse(status_code=404, content={"message": "Challan not found."})
+    return {"message": f"Challan {challan_number} marked as PAID."}
+
+
+@app.get("/api/search-plate/{plate}")
+async def search_plate(plate: str):
+    if challan_col is None or owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    clean = re.sub(r'[^A-Z0-9]', '', plate.upper().strip())
+    owner = owner_col.find_one({"vehicles": {"$regex": f"^{clean}$", "$options": "i"}})
+    challans_raw = list(challan_col.find({"vehicle_id": {"$regex": f"^{clean}$", "$options": "i"}}))
+    challans = []
+    for c in challans_raw:
+        issued = c.get("issued_at", datetime.now(UTC))
+        challans.append({
+            "challan_number": c.get("challan_number", "N/A"),
+            "vehicle_id": c.get("vehicle_id", ""),
+            "violation_type": c.get("violation_type", ""),
+            "fine": c.get("fine", 0),
+            "status": c.get("status", "UNPAID"),
+            "issued_at": issued.strftime("%Y-%m-%d") if hasattr(issued, "strftime") else str(issued)
+        })
+    return {
+        "owner_name": owner.get("name") if owner else "Not Registered",
+        "owner_nic": owner.get("nic") if owner else "N/A",
+        "challans": challans
+    }
+
+
+@app.post("/api/remove-vehicle")
+async def remove_vehicle(data: RemoveVehicleData):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    result = owner_col.update_one({"nic": data.nic}, {"$pull": {"vehicles": data.vehicle_id}})
+    if result.matched_count == 0:
+        return JSONResponse(status_code=404, content={"message": "User not found."})
+    return {"message": f"Vehicle {data.vehicle_id} removed."}
+
+
+@app.get("/stats", response_class=HTMLResponse)
+async def stats_page(request: Request):
+    return templates.TemplateResponse(request=request, name="stats.html")
+
+
+@app.get("/api/stats")
+async def get_stats():
+    if challan_col is None or owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    total = challan_col.count_documents({})
+    paid = challan_col.count_documents({"status": "PAID"})
+    unpaid = challan_col.count_documents({"status": "UNPAID"})
+    collected_agg = list(challan_col.aggregate([{"$match": {"status": "PAID"}}, {"$group": {"_id": None, "t": {"$sum": "$fine"}}}]))
+    pending_agg = list(challan_col.aggregate([{"$match": {"status": "UNPAID"}}, {"$group": {"_id": None, "t": {"$sum": "$fine"}}}]))
+    violations_agg = list(challan_col.aggregate([{"$group": {"_id": "$violation_type", "count": {"$sum": 1}}}]))
+    monthly_agg = list(challan_col.aggregate([
+        {"$group": {"_id": {"year": {"$year": "$issued_at"}, "month": {"$month": "$issued_at"}}, "count": {"$sum": 1}, "fines": {"$sum": "$fine"}}},
+        {"$sort": {"_id.year": 1, "_id.month": 1}},
+        {"$limit": 6}
+    ]))
+    months_map = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
+    return {
+        "total_challans": total,
+        "paid_challans": paid,
+        "unpaid_challans": unpaid,
+        "total_collected": collected_agg[0]["t"] if collected_agg else 0,
+        "total_pending": pending_agg[0]["t"] if pending_agg else 0,
+        "violations_breakdown": {v["_id"]: v["count"] for v in violations_agg if v["_id"]},
+        "monthly_labels": [f"{months_map.get(m['_id']['month'], '?')} {m['_id']['year']}" for m in monthly_agg],
+        "monthly_counts": [m["count"] for m in monthly_agg],
+        "total_citizens": owner_col.count_documents({})
+    }
+
+
+@app.post("/api/forgot-password")
+async def forgot_password(data: ForgotPasswordData):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    user = owner_col.find_one({"nic": data.nic})
+    if not user:
+        return JSONResponse(status_code=404, content={"message": "No account found with this CNIC."})
+    otp = str(random.randint(100000, 999999))
+    otp_store[data.nic] = {"otp": otp, "expires": time.time() + 300}
+    msg = f"🔐 Your TrafficGuard OTP is: *{otp}*\nValid for 5 minutes. Do not share with anyone."
+    phone = user.get("phone", "")
+    if twilio_client and TWILIO_NUM and phone:
+        try:
+            twilio_client.messages.create(from_=f"whatsapp:{TWILIO_NUM}", body=msg, to=f"whatsapp:+{phone}")
+            masked = phone[-4:].rjust(len(phone), '*')
+            return {"message": f"OTP sent to WhatsApp ending in {phone[-4:]}."}
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"message": f"Failed to send OTP: {str(e)}"})
+    return {"message": f"[DEV] OTP: {otp} (Twilio not configured)"}
+
+
+@app.post("/api/reset-password")
+async def reset_password(data: ResetPasswordData):
+    if owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    record = otp_store.get(data.nic)
+    if not record:
+        return JSONResponse(status_code=400, content={"message": "No OTP found. Request a new one."})
+    if time.time() > record["expires"]:
+        del otp_store[data.nic]
+        return JSONResponse(status_code=400, content={"message": "OTP expired. Request a new one."})
+    if record["otp"] != data.otp:
+        return JSONResponse(status_code=400, content={"message": "Invalid OTP. Please try again."})
+    owner_col.update_one({"nic": data.nic}, {"$set": {"password": data.new_password}})
+    del otp_store[data.nic]
+    return {"message": "Password reset successfully! You can now log in."}
 
 
 if __name__ == "__main__":

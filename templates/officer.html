@@ -45,7 +45,7 @@
             <img src="data:image/jpeg;base64,{{ result.violation_image }}" alt="Violation Frame">
             <p><strong>Plate:</strong> {{ result.number_plate }}</p>
             <p><strong>Vehicle Type:</strong> {{ result.vehicle }}</p>
-            
+
             <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
             <p><strong>Registered Owner:</strong> {{ result.owner_name or "Not Registered" }}</p>
             <p><strong>Owner CNIC:</strong> {{ result.owner_nic or "N/A" }}</p>
@@ -53,16 +53,82 @@
 
             <p><strong>Violation:</strong> {{ result.type }}</p>
             <p><strong>Fine Amount:</strong> PKR {{ result.fine }}</p>
-            <p style="font-size: 0.8rem; color: #64748b;">System Log: {{ result.notification_status }}</p>
+            {% if result.challan_number %}
+            <p><strong>Challan #:</strong> {{ result.challan_number }}</p>
+            <button onclick="markPaid('{{ result.challan_number }}')" id="pay-btn" style="width:100%;padding:10px;background:#166534;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-top:5px;">✅ Mark as PAID</button>
+            {% endif %}
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 10px;">System Log: {{ result.notification_status }}</p>
         </div>
         {% endif %}
 
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-            <a href="/" style="display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+        <div class="form-group" style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+            <label style="font-weight: bold; display: block; margin-bottom: 8px;">🔍 Search by Plate Number</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="search-plate-input" placeholder="e.g. KHI1234" style="flex:1; padding:10px; border:2px solid #e2e8f0; border-radius:8px; font-size:1rem;">
+                <button onclick="searchPlate()" class="btn-main" style="width:auto; padding:10px 18px;">Search</button>
+            </div>
+            <div id="search-result" style="margin-top: 12px;"></div>
+        </div>
+
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
+            <a href="/" style="flex:1; display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
                 ← Citizen Portal
+            </a>
+            <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+                📊 Statistics
             </a>
         </div>
     </div>
 
+    <script>
+        async function markPaid(challanNo) {
+            if (!confirm(`Mark challan ${challanNo} as PAID?`)) return;
+            const res = await fetch(`/api/challan/${challanNo}/pay`, { method: 'PATCH' });
+            const result = await res.json();
+            alert(result.message);
+            if (res.ok) {
+                const btn = document.getElementById('pay-btn');
+                if (btn) { btn.textContent = '✅ PAID'; btn.disabled = true; btn.style.background = '#9ca3af'; }
+            }
+        }
+
+        async function searchPlate() {
+            const plate = document.getElementById('search-plate-input').value.trim();
+            const box = document.getElementById('search-result');
+            if (!plate) { box.innerHTML = '<p style="color:#dc2626;">Enter a plate number.</p>'; return; }
+            box.innerHTML = '<p style="color:#64748b;">Searching...</p>';
+            const res = await fetch(`/api/search-plate/${encodeURIComponent(plate)}`);
+            const data = await res.json();
+            if (!res.ok) { box.innerHTML = `<p style="color:#dc2626;">${data.message}</p>`; return; }
+
+            let rows = data.challans.map(c => `
+                <tr>
+                    <td>${c.challan_number}</td>
+                    <td>${c.violation_type}</td>
+                    <td>PKR ${c.fine}</td>
+                    <td style="color:${c.status==='UNPAID'?'#dc2626':'#166534'};font-weight:bold;">${c.status}</td>
+                    <td>${c.issued_at}</td>
+                    <td>${c.status==='UNPAID' ? `<button onclick="markPaid('${c.challan_number}')" style="background:#166534;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">Mark Paid</button>` : '—'}</td>
+                </tr>`).join('');
+
+            box.innerHTML = `
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+                    <p style="margin:0 0 4px 0;"><strong>Owner:</strong> ${data.owner_name} &nbsp;|&nbsp; <strong>CNIC:</strong> ${data.owner_nic}</p>
+                    <p style="margin:0 0 10px 0; font-size:0.85rem; color:#64748b;">${data.challans.length} challan(s) found for <strong>${plate.toUpperCase()}</strong></p>
+                    ${data.challans.length > 0 ? `
+                    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                        <thead><tr style="background:#f1f5f9;">
+                            <th style="padding:6px;text-align:left;">Challan #</th>
+                            <th style="padding:6px;text-align:left;">Violation</th>
+                            <th style="padding:6px;text-align:left;">Fine</th>
+                            <th style="padding:6px;text-align:left;">Status</th>
+                            <th style="padding:6px;text-align:left;">Date</th>
+                            <th style="padding:6px;text-align:left;">Action</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>` : ''}
+                </div>`;
+        }
+    </script>
 </body>
 </html>

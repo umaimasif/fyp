@@ -45,6 +45,7 @@
             <div class="form-group"><label>Password</label><input type="password" id="login-pass"></div>
             <button class="btn-main" onclick="handleLogin()">Log In</button>
             <div class="switch-link">Not registered? <span onclick="toggleView('register-section')">Create Account</span></div>
+            <div class="switch-link" style="margin-top: 6px;">Forgot password? <span onclick="toggleView('forgot-section')">Reset via WhatsApp</span></div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
             <div style="text-align: center; font-size: 0.9rem; color: #64748b;">
                 Are you an Officer? <a href="/officer" style="color: #dc2626; font-weight: 600; text-decoration: none;">Click Here</a>
@@ -60,6 +61,20 @@
             <div class="switch-link">Have an account? <span onclick="toggleView('login-section')">Log In</span></div>
         </div>
 
+        <div id="forgot-section" class="hidden">
+            <h3 style="color: var(--primary-color); margin-top: 0;">Reset Password</h3>
+            <div id="otp-step-1">
+                <div class="form-group"><label>CNIC Number</label><input type="text" id="forgot-nic" placeholder="42201-1234567-1"></div>
+                <button class="btn-main" onclick="sendOTP()">Send OTP via WhatsApp</button>
+            </div>
+            <div id="otp-step-2" class="hidden">
+                <div class="form-group"><label>Enter OTP (6 digits)</label><input type="text" id="otp-code" placeholder="123456" maxlength="6"></div>
+                <div class="form-group"><label>New Password</label><input type="password" id="new-pass"></div>
+                <button class="btn-main" onclick="resetPassword()">Reset Password</button>
+            </div>
+            <div class="switch-link"><span onclick="toggleView('login-section')">← Back to Login</span></div>
+        </div>
+
         <div id="dashboard-section" class="hidden">
             <h2 style="color: var(--primary-color);">Welcome, <span id="user-name-display"></span></h2>
             
@@ -67,6 +82,8 @@
                 <h4 style="margin: 0 0 10px 0; color: var(--primary-color);">🚗 Officially Registered Vehicles</h4>
                 <div id="vehicle-list" style="margin-bottom: 5px;"></div>
             </div>
+
+            <div id="challan-counter" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;"></div>
 
             <h3 style="text-align: left; margin-top: 25px;">Your Challans</h3>
             <div style="overflow-x: auto;">
@@ -87,9 +104,12 @@
             </div>
 
             <button class="btn-main btn-logout" onclick="handleLogout()">Log Out</button>
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-                <a href="/officer" style="display: block; text-align: center; background: #dc2626; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
-                    Traffic Officer Portal →
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
+                <a href="/officer" style="flex:1; display: block; text-align: center; background: #dc2626; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+                    Officer Portal →
+                </a>
+                <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
+                    📊 Statistics
                 </a>
             </div>
         </div>
@@ -109,9 +129,9 @@
         }
 
         function toggleView(sectionId) {
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('register-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
+            ['login-section','register-section','dashboard-section','forgot-section'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
             document.getElementById(sectionId).classList.remove('hidden');
             msgBox.style.display = 'none';
         }
@@ -158,11 +178,29 @@
             vehicleList.innerHTML = "";
             if (data.vehicles && data.vehicles.length > 0) {
                 data.vehicles.forEach(v => {
-                    vehicleList.innerHTML += `<span class="vehicle-badge">${v}</span>`;
+                    vehicleList.innerHTML += `<span class="vehicle-badge">${v} <span onclick="removeVehicle('${v}')" title="Remove vehicle" style="cursor:pointer;opacity:0.75;margin-left:6px;font-size:0.8rem;">✕</span></span>`;
                 });
             } else {
                 vehicleList.innerHTML = `<span style="color: #64748b; font-size: 0.9rem;">No vehicles found attached to this CNIC in the official database.</span>`;
             }
+
+            const challans = data.challans || [];
+            const unpaidCount = challans.filter(c => c.status === 'UNPAID').length;
+            const amountDue = challans.filter(c => c.status === 'UNPAID').reduce((s, c) => s + c.fine, 0);
+            document.getElementById('challan-counter').innerHTML = `
+                <div style="background:#f1f5f9;padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
+                    <div style="font-size:1.6rem;font-weight:bold;color:#334155;">${challans.length}</div>
+                    <div style="font-size:0.75rem;color:#64748b;">Total Challans</div>
+                </div>
+                <div style="background:#fee2e2;padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
+                    <div style="font-size:1.6rem;font-weight:bold;color:#dc2626;">${unpaidCount}</div>
+                    <div style="font-size:0.75rem;color:#991b1b;">Unpaid</div>
+                </div>
+                <div style="background:#dcfce7;padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
+                    <div style="font-size:1.4rem;font-weight:bold;color:#166534;">Rs ${amountDue.toLocaleString()}</div>
+                    <div style="font-size:0.75rem;color:#14532d;">Amount Due</div>
+                </div>
+            `;
 
             const tbody = document.getElementById('challan-table-body');
             tbody.innerHTML = ""; 
@@ -193,6 +231,44 @@
             document.getElementById('login-nic').value = '';
             document.getElementById('login-pass').value = '';
             toggleView('login-section');
+        }
+
+        async function removeVehicle(vehicleId) {
+            if (!confirm(`Remove vehicle ${vehicleId} from your profile?`)) return;
+            const nic = localStorage.getItem('userNic');
+            const res = await fetch('/api/remove-vehicle', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nic, vehicle_id: vehicleId}) });
+            const result = await res.json();
+            showMessage(result.message, !res.ok);
+            if (res.ok) loadDashboard();
+        }
+
+        async function sendOTP() {
+            const nic = document.getElementById('forgot-nic').value.trim();
+            if (!nic) { showMessage('Please enter your CNIC.', true); return; }
+            const res = await fetch('/api/forgot-password', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nic}) });
+            const result = await res.json();
+            showMessage(result.message, !res.ok);
+            if (res.ok) {
+                document.getElementById('otp-step-1').classList.add('hidden');
+                document.getElementById('otp-step-2').classList.remove('hidden');
+            }
+        }
+
+        async function resetPassword() {
+            const nic = document.getElementById('forgot-nic').value.trim();
+            const otp = document.getElementById('otp-code').value.trim();
+            const new_password = document.getElementById('new-pass').value;
+            if (!otp || !new_password) { showMessage('Please fill all fields.', true); return; }
+            const res = await fetch('/api/reset-password', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nic, otp, new_password}) });
+            const result = await res.json();
+            showMessage(result.message, !res.ok);
+            if (res.ok) {
+                setTimeout(() => {
+                    document.getElementById('otp-step-1').classList.remove('hidden');
+                    document.getElementById('otp-step-2').classList.add('hidden');
+                    toggleView('login-section');
+                }, 1500);
+            }
         }
     </script>
 </body>
