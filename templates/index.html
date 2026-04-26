@@ -29,6 +29,24 @@
         th { background-color: #f8fafc; }
         .status-unpaid { color: #dc2626; font-weight: bold; }
         .status-paid { color: #166534; font-weight: bold; }
+
+        /* Payment Modal */
+        .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:1000; justify-content:center; align-items:center; padding:20px; box-sizing:border-box; }
+        .modal-box { background:white; border-radius:16px; padding:1.5rem; width:100%; max-width:370px; box-shadow:0 25px 50px rgba(0,0,0,0.4); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+        .modal-header h3 { margin:0; color:var(--primary-color); }
+        .modal-close { background:none; border:none; font-size:1.3rem; cursor:pointer; color:#94a3b8; line-height:1; }
+        .pay-summary { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:18px; }
+        .pay-summary-amount { font-size:1.6rem; font-weight:800; color:var(--primary-color); margin-top:4px; }
+        .card-row { display:flex; gap:10px; }
+        .card-row .form-group { flex:1; }
+        .card-brand { float:right; font-size:0.75rem; color:#64748b; margin-top:-20px; }
+        .spinner { width:38px; height:38px; border:4px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 12px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .check-icon { font-size:3.5rem; display:block; text-align:center; animation:popIn 0.4s ease; }
+        @keyframes popIn { 0%{transform:scale(0.3);opacity:0} 70%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+        .btn-pay { background:linear-gradient(135deg,#4f46e5,#7c3aed); font-size:1rem; letter-spacing:0.3px; }
+        .btn-pay:hover { opacity:0.92; }
     </style>
 </head>
 <body>
@@ -215,8 +233,9 @@
                             <td>${c.violation_type}</td>
                             <td>Rs ${c.fine}</td>
                             <td class="${statusClass}">${c.status}</td>
-                            <td>
-                                <a href="/api/download-challan/${c.challan_number}" target="_blank" style="background: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 0.75rem; font-weight: bold; white-space: nowrap;">Download PDF</a>
+                            <td style="white-space:nowrap;">
+                                ${c.status === 'UNPAID' ? `<button onclick="openPayment('${c.challan_number}',${c.fine},'${c.violation_type}')" style="background:#4f46e5;color:white;border:none;padding:5px 9px;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:bold;margin-right:4px;">💳 Pay</button>` : ''}
+                                <a href="/api/download-challan/${c.challan_number}" target="_blank" style="background:#64748b;color:white;padding:5px 9px;border-radius:4px;text-decoration:none;font-size:0.75rem;font-weight:bold;">PDF</a>
                             </td>
                         </tr>
                     `;
@@ -270,6 +289,145 @@
                 }, 1500);
             }
         }
+
+        // ── Payment Modal ──────────────────────────────
+        let _payingChallan = null;
+
+        function openPayment(challanNo, amount, violation) {
+            _payingChallan = { challanNo, amount, violation };
+            document.getElementById('pm-challan').innerText = challanNo;
+            document.getElementById('pm-violation').innerText = violation;
+            document.getElementById('pm-amount').innerText = 'PKR ' + Number(amount).toLocaleString();
+            document.getElementById('pm-btn-label').innerText = 'PKR ' + Number(amount).toLocaleString();
+            document.getElementById('pm-card').value = '';
+            document.getElementById('pm-expiry').value = '';
+            document.getElementById('pm-cvv').value = '';
+            document.getElementById('pm-name').value = '';
+            document.getElementById('pm-brand').innerText = '';
+            document.getElementById('pm-form').style.display = 'block';
+            document.getElementById('pm-processing').style.display = 'none';
+            document.getElementById('pm-success').style.display = 'none';
+            document.getElementById('payment-modal').style.display = 'flex';
+        }
+
+        function closePayment() {
+            document.getElementById('payment-modal').style.display = 'none';
+            _payingChallan = null;
+        }
+
+        // Format card number with spaces
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('pm-card').addEventListener('input', function() {
+                let v = this.value.replace(/\D/g,'').substring(0,16);
+                this.value = v.replace(/(.{4})/g,'$1 ').trim();
+                const brands = {'4':'VISA','5':'MASTERCARD','3':'AMEX','6':'UNIONPAY'};
+                document.getElementById('pm-brand').innerText = brands[v[0]] || '';
+            });
+            document.getElementById('pm-expiry').addEventListener('input', function() {
+                let v = this.value.replace(/\D/g,'').substring(0,4);
+                if (v.length >= 3) v = v.substring(0,2) + '/' + v.substring(2);
+                this.value = v;
+            });
+            document.getElementById('pm-cvv').addEventListener('input', function() {
+                this.value = this.value.replace(/\D/g,'').substring(0,4);
+            });
+        });
+
+        function luhn(num) {
+            const d = num.replace(/\D/g,'');
+            let sum = 0, even = false;
+            for (let i = d.length-1; i >= 0; i--) {
+                let n = parseInt(d[i]);
+                if (even) { n *= 2; if (n > 9) n -= 9; }
+                sum += n; even = !even;
+            }
+            return d.length >= 13 && sum % 10 === 0;
+        }
+
+        async function processPayment() {
+            const card = document.getElementById('pm-card').value.replace(/\s/g,'');
+            const expiry = document.getElementById('pm-expiry').value;
+            const cvv = document.getElementById('pm-cvv').value;
+            const name = document.getElementById('pm-name').value.trim();
+
+            if (!luhn(card)) { alert('Invalid card number.'); return; }
+            const parts = expiry.split('/');
+            if (parts.length !== 2 || parts[0] < 1 || parts[0] > 12) { alert('Invalid expiry date.'); return; }
+            const now = new Date();
+            const expYear = 2000 + parseInt(parts[1]);
+            const expMonth = parseInt(parts[0]);
+            if (expYear < now.getFullYear() || (expYear === now.getFullYear() && expMonth < now.getMonth()+1)) { alert('Card is expired.'); return; }
+            if (cvv.length < 3) { alert('Invalid CVV.'); return; }
+            if (!name) { alert('Enter cardholder name.'); return; }
+
+            document.getElementById('pm-form').style.display = 'none';
+            document.getElementById('pm-processing').style.display = 'block';
+
+            await new Promise(r => setTimeout(r, 2200));
+
+            const res = await fetch(`/api/challan/${_payingChallan.challanNo}/pay`, { method: 'PATCH' });
+            if (res.ok) {
+                document.getElementById('pm-processing').style.display = 'none';
+                document.getElementById('pm-success').style.display = 'block';
+                document.getElementById('pm-success-amount').innerText = 'PKR ' + Number(_payingChallan.amount).toLocaleString();
+                setTimeout(() => { closePayment(); loadDashboard(); }, 2500);
+            } else {
+                document.getElementById('pm-processing').style.display = 'none';
+                document.getElementById('pm-form').style.display = 'block';
+                alert('Payment failed. Please try again.');
+            }
+        }
     </script>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal-overlay" onclick="if(event.target===this)closePayment()">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>💳 Pay Challan</h3>
+                <button class="modal-close" onclick="closePayment()">✕</button>
+            </div>
+
+            <div class="pay-summary">
+                <div style="font-size:0.8rem;color:#64748b;">Challan # <strong id="pm-challan"></strong></div>
+                <div style="font-size:0.85rem;color:#334155;margin-top:2px;" id="pm-violation"></div>
+                <div class="pay-summary-amount" id="pm-amount"></div>
+            </div>
+
+            <div id="pm-form">
+                <div class="form-group">
+                    <label>Card Number <span id="pm-brand" style="float:right;color:#64748b;font-size:0.75rem;font-weight:normal;"></span></label>
+                    <input id="pm-card" type="text" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number">
+                </div>
+                <div class="card-row">
+                    <div class="form-group">
+                        <label>Expiry</label>
+                        <input id="pm-expiry" type="text" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+                    </div>
+                    <div class="form-group">
+                        <label>CVV</label>
+                        <input id="pm-cvv" type="password" placeholder="•••" maxlength="4" autocomplete="cc-csc">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Cardholder Name</label>
+                    <input id="pm-name" type="text" placeholder="Name on card" autocomplete="cc-name">
+                </div>
+                <p style="font-size:0.75rem;color:#94a3b8;text-align:center;margin:8px 0;">🔒 Demo mode — use test card <strong>4242 4242 4242 4242</strong></p>
+                <button class="btn-main btn-pay" onclick="processPayment()">Pay <span id="pm-btn-label"></span></button>
+            </div>
+
+            <div id="pm-processing" style="display:none;text-align:center;padding:20px 0;">
+                <div class="spinner"></div>
+                <p style="color:#64748b;font-weight:600;margin:0;">Processing payment...</p>
+            </div>
+
+            <div id="pm-success" style="display:none;text-align:center;padding:10px 0;">
+                <span class="check-icon">✅</span>
+                <h3 style="color:#166534;margin:10px 0 4px;">Payment Successful!</h3>
+                <p id="pm-success-amount" style="font-size:1.2rem;font-weight:bold;color:#4f46e5;margin:0;"></p>
+                <p style="color:#64748b;font-size:0.85rem;margin-top:8px;">Challan marked as PAID</p>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
