@@ -2,13 +2,15 @@ import os
 import time
 import json
 import random
+import csv
+import io
 import cv2
 import base64
 import numpy as np
 import re
 from datetime import datetime, UTC
 from fastapi import FastAPI, UploadFile, File, Request, Form
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
@@ -41,6 +43,19 @@ except Exception as e:
 db = mongo_client["traffic_challan_system"] if mongo_client is not None else None
 challan_col = db["challans"] if db is not None else None
 owner_col = db["owners"] if db is not None else None
+officer_col = db["officers"] if db is not None else None
+audit_col = db["audit_log"] if db is not None else None
+
+# Seed default officer account if none exists
+if officer_col is not None and officer_col.count_documents({}) == 0:
+    officer_col.insert_one({
+        "username": "officer",
+        "password": "admin123",
+        "name": "Default Officer",
+        "badge_id": "OFC-001",
+        "created_at": datetime.now(UTC)
+    })
+    print("✅ Seeded default officer (officer / admin123)")
 
 # Twilio Setup
 twilio_client = None
@@ -73,6 +88,14 @@ class ResetPasswordData(BaseModel):
     nic: str
     otp: str
     new_password: str
+
+class OfficerLoginData(BaseModel):
+    username: str
+    password: str
+
+class ChatMessage(BaseModel):
+    message: str
+    history: list = []
 
 # --- LOAD CUSTOM YOLO MODEL ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -394,12 +417,22 @@ async def process_video(request: Request, video: UploadFile = File(...)):
 # ==========================================
 
 @app.patch("/api/challan/{challan_number}/pay")
-async def mark_challan_paid(challan_number: str):
+async def mark_challan_paid(challan_number: str, by: str = "system"):
     if challan_col is None:
         return JSONResponse(status_code=503, content={"message": "Database unavailable."})
-    result = challan_col.update_one({"challan_number": challan_number}, {"$set": {"status": "PAID"}})
+    result = challan_col.update_one(
+        {"challan_number": challan_number},
+        {"$set": {"status": "PAID", "paid_at": datetime.now(UTC)}}
+    )
     if result.matched_count == 0:
         return JSONResponse(status_code=404, content={"message": "Challan not found."})
+    if audit_col is not None:
+        audit_col.insert_one({
+            "challan_number": challan_number,
+            "action": "MARKED_PAID",
+            "by": by,
+            "timestamp": datetime.now(UTC)
+        })
     return {"message": f"Challan {challan_number} marked as PAID."}
 
 
@@ -508,6 +541,122 @@ async def reset_password(data: ResetPasswordData):
     owner_col.update_one({"nic": data.nic}, {"$set": {"password": data.new_password}})
     del otp_store[data.nic]
     return {"message": "Password reset successfully! You can now log in."}
+
+
+# ==========================================
+# 7. BATCH-1 ENDPOINTS (Officer auth, leaderboard, export, chatbot, audit)
+# ==========================================
+
+@app.post("/api/officer-login")
+async def officer_login(data: OfficerLoginData):
+    if officer_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    officer = officer_col.find_one({"username": data.username, "password": data.password})
+    if not officer:
+        return JSONResponse(status_code=401, content={"message": "Invalid officer credentials."})
+    return {
+        "message": "Officer login successful.",
+        "name": officer.get("name", ""),
+        "badge_id": officer.get("badge_id", ""),
+        "username": officer.get("username", "")
+    }
+
+
+@app.get("/api/leaderboard")
+async def leaderboard():
+    if challan_col is None or owner_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    pipeline = [
+        {"$group": {
+            "_id": "$owner_id",
+            "violation_count": {"$sum": 1},
+            "total_fine": {"$sum": "$fine"},
+            "unpaid_count": {"$sum": {"$cond": [{"$eq": ["$status", "UNPAID"]}, 1, 0]}}
+        }},
+        {"$sort": {"violation_count": -1}},
+        {"$limit": 10}
+    ]
+    top = list(challan_col.aggregate(pipeline))
+    out = []
+    for entry in top:
+        owner = owner_col.find_one({"_id": entry["_id"]}) if entry["_id"] else None
+        out.append({
+            "name": owner.get("name", "Unknown") if owner else "Unknown",
+            "nic_masked": (owner["nic"][:5] + "*****" + owner["nic"][-2:]) if owner and owner.get("nic") else "N/A",
+            "violation_count": entry["violation_count"],
+            "total_fine": entry["total_fine"],
+            "unpaid_count": entry["unpaid_count"]
+        })
+    return {"leaderboard": out}
+
+
+@app.get("/api/export-stats-csv")
+async def export_stats_csv():
+    if challan_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    rows = list(challan_col.find({}, {"_id": 0, "owner_id": 0}))
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Challan Number", "Vehicle ID", "Violation Type", "Fine (PKR)", "Status", "Issued At", "Paid At"])
+    for r in rows:
+        issued = r.get("issued_at", "")
+        paid = r.get("paid_at", "")
+        writer.writerow([
+            r.get("challan_number", ""),
+            r.get("vehicle_id", ""),
+            r.get("violation_type", ""),
+            r.get("fine", 0),
+            r.get("status", ""),
+            issued.strftime("%Y-%m-%d %H:%M") if hasattr(issued, "strftime") else str(issued),
+            paid.strftime("%Y-%m-%d %H:%M") if hasattr(paid, "strftime") else str(paid)
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=trafficguard_stats_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )
+
+
+@app.post("/api/chatbot")
+async def chatbot(data: ChatMessage):
+    if not GROQ_API_KEY:
+        return JSONResponse(status_code=503, content={"message": "Chatbot unavailable (no Groq key)."})
+    system_prompt = (
+        "You are TrafficGuard Assistant — a friendly, concise chatbot helping Pakistani citizens "
+        "with traffic challans. You answer questions about: how to view challans, how to pay online "
+        "(citizens use the Pay button on their dashboard, mock card flow), what violations cost "
+        "(Helmet 1000, Phone 1000, Triple Riding 2000, Seatbelt 3000), how to register vehicles "
+        "(automatically linked by CNIC), how to reset password (Forgot Password sends WhatsApp OTP), "
+        "and the officer portal at /officer. Keep answers under 3 sentences. Use simple English."
+    )
+    messages = [{"role": "system", "content": system_prompt}]
+    for msg in data.history[-6:]:
+        if msg.get("role") in ("user", "assistant"):
+            messages.append({"role": msg["role"], "content": msg.get("content", "")})
+    messages.append({"role": "user", "content": data.message})
+    try:
+        completion = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=messages,
+            max_tokens=200,
+            temperature=0.5
+        )
+        reply = completion.choices[0].message.content
+        return {"reply": reply}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": f"Chatbot error: {str(e)}"})
+
+
+@app.get("/api/audit-log")
+async def get_audit_log(limit: int = 50):
+    if audit_col is None:
+        return JSONResponse(status_code=503, content={"message": "Database unavailable."})
+    entries = list(audit_col.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit))
+    for e in entries:
+        ts = e.get("timestamp")
+        e["timestamp"] = ts.strftime("%Y-%m-%d %H:%M:%S") if hasattr(ts, "strftime") else str(ts)
+    return {"entries": entries}
 
 
 if __name__ == "__main__":

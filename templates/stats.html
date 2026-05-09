@@ -4,35 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Statistics - TrafficGuard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='20' y='4' width='24' height='56' rx='6' fill='%23334155'/%3E%3Ccircle cx='32' cy='16' r='6' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23facc15'/%3E%3Ccircle cx='32' cy='48' r='6' fill='%2322c55e'/%3E%3C/svg%3E">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #4f46e5; --red: #dc2626; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; margin: 0; padding: 20px; color: #334155; }
-        h1 { color: white; text-align: center; margin-bottom: 5px; }
-        .subtitle { color: #94a3b8; text-align: center; margin-bottom: 30px; }
+        :root {
+            --primary: #4f46e5;
+            --red: #dc2626;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-color: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --section-bg: #f8fafc;
+        }
+        [data-theme="dark"] {
+            --bg-color: #020617;
+            --card-bg: #1e293b;
+            --text-color: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #334155;
+            --section-bg: #0f172a;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-color); }
+        .header-row { display: flex; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 10px; }
+        .header-row h1 { color: white; margin: 0; }
+        .toolbar { display: flex; gap: 8px; }
+        .icon-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-color); width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+        .subtitle { color: #94a3b8; text-align: center; margin: 0 0 25px 0; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; max-width: 900px; margin: 0 auto 30px; }
-        .stat-card { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .stat-card { background: var(--card-bg); border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); color: var(--text-color); }
         .stat-card .value { font-size: 2rem; font-weight: bold; color: var(--primary); }
         .stat-card .value.red { color: var(--red); }
-        .stat-card .value.green { color: #166534; }
-        .stat-card .label { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
-        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; margin: 0 auto; }
+        .stat-card .value.green { color: #22c55e; }
+        .stat-card .label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; margin: 0 auto 20px; }
         @media (max-width: 640px) { .charts { grid-template-columns: 1fr; } }
-        .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .chart-card h3 { margin: 0 0 15px 0; color: #334155; font-size: 1rem; }
+        .chart-card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .chart-card h3 { margin: 0 0 15px 0; color: var(--text-color); font-size: 1rem; }
+        .leaderboard { max-width: 900px; margin: 0 auto 20px; background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .leaderboard h3 { margin: 0 0 15px; color: var(--text-color); display: flex; justify-content: space-between; align-items: center; }
+        .leaderboard table { width: 100%; border-collapse: collapse; color: var(--text-color); font-size: 0.9rem; }
+        .leaderboard th, .leaderboard td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+        .leaderboard th { background: var(--section-bg); font-size: 0.8rem; }
+        .rank-badge { display: inline-block; width: 26px; height: 26px; border-radius: 50%; line-height: 26px; text-align: center; font-weight: bold; color: white; font-size: 0.8rem; }
+        .rank-1 { background: #facc15; color: #422006; }
+        .rank-2 { background: #94a3b8; }
+        .rank-3 { background: #c2845a; }
+        .rank-other { background: var(--muted); }
         .nav-links { display: flex; gap: 10px; max-width: 900px; margin: 20px auto 0; }
         .nav-links a { flex: 1; padding: 12px; border-radius: 8px; text-align: center; color: white; text-decoration: none; font-weight: 600; }
         .loading { color: #94a3b8; text-align: center; padding: 40px; }
+        .csv-btn { background: #166534; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; text-decoration: none; }
     </style>
 </head>
 <body>
-    <h1>📊 TrafficGuard Statistics</h1>
+    <div class="header-row">
+        <h1>📊 TrafficGuard Statistics</h1>
+        <div class="toolbar">
+            <button class="icon-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
+            <a href="/api/export-stats-csv" class="csv-btn" download>⬇ Export CSV</a>
+        </div>
+    </div>
     <p class="subtitle">Live data from the traffic enforcement system</p>
 
     <div id="loading" class="loading">Loading statistics...</div>
 
     <div id="content" style="display:none;">
         <div class="grid" id="stat-cards"></div>
+
         <div class="charts">
             <div class="chart-card">
                 <h3>Violations Breakdown</h3>
@@ -43,14 +82,31 @@
                 <canvas id="monthlyChart"></canvas>
             </div>
         </div>
+
+        <div class="leaderboard">
+            <h3>🏆 Top Violators
+                <button onclick="loadLeaderboard()" style="background:none;border:1px solid var(--border);color:var(--text-color);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">Refresh</button>
+            </h3>
+            <div id="leaderboard-body"></div>
+        </div>
     </div>
 
-    <div class="nav-links" style="max-width:900px; margin: 20px auto 0;">
+    <div class="nav-links">
         <a href="/" style="background:#4f46e5;">← Citizen Portal</a>
         <a href="/officer" style="background:#dc2626;">Officer Portal →</a>
     </div>
 
     <script>
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('theme-btn').innerText = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('theme', theme);
+        }
+        function toggleTheme() {
+            const cur = localStorage.getItem('theme') || 'light';
+            applyTheme(cur === 'light' ? 'dark' : 'light');
+        }
+
         async function loadStats() {
             try {
                 const res = await fetch('/api/stats');
@@ -77,7 +133,7 @@
                         labels: vLabels,
                         datasets: [{ data: vValues, backgroundColor: ['#4f46e5','#dc2626','#f59e0b','#10b981','#8b5cf6'] }]
                     },
-                    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+                    options: { plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(), font: { size: 11 } } } } }
                 });
 
                 new Chart(document.getElementById('monthlyChart'), {
@@ -86,13 +142,54 @@
                         labels: d.monthly_labels || [],
                         datasets: [{ label: 'Challans', data: d.monthly_counts || [], backgroundColor: '#4f46e5', borderRadius: 6 }]
                     },
-                    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { stepSize: 1, color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() } },
+                            x: { ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() } }
+                        }
+                    }
                 });
 
+                loadLeaderboard();
             } catch (e) {
                 document.getElementById('loading').innerHTML = `<span style="color:#dc2626;">Error: ${e.message}</span>`;
             }
         }
+
+        async function loadLeaderboard() {
+            const body = document.getElementById('leaderboard-body');
+            body.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
+            try {
+                const res = await fetch('/api/leaderboard');
+                const d = await res.json();
+                if (!d.leaderboard || d.leaderboard.length === 0) {
+                    body.innerHTML = '<p style="color:var(--muted);">No data yet.</p>';
+                    return;
+                }
+                const rows = d.leaderboard.map((e, i) => {
+                    const rank = i + 1;
+                    const cls = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+                    return `
+                    <tr>
+                        <td><span class="rank-badge ${cls}">${rank}</span></td>
+                        <td><strong>${e.name}</strong><br><span style="color:var(--muted);font-size:0.75rem;">${e.nic_masked}</span></td>
+                        <td>${e.violation_count}</td>
+                        <td style="color:#dc2626;font-weight:bold;">${e.unpaid_count}</td>
+                        <td>Rs ${e.total_fine.toLocaleString()}</td>
+                    </tr>`;
+                }).join('');
+                body.innerHTML = `
+                    <table>
+                        <thead><tr><th>Rank</th><th>Citizen</th><th>Total</th><th>Unpaid</th><th>Total Fines</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            } catch (e) {
+                body.innerHTML = '<p style="color:#dc2626;">Failed to load leaderboard.</p>';
+            }
+        }
+
+        applyTheme(localStorage.getItem('theme') || 'light');
         loadStats();
     </script>
 </body>

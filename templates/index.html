@@ -4,139 +4,320 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Citizen Portal - TrafficGuard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='20' y='4' width='24' height='56' rx='6' fill='%23334155'/%3E%3Ccircle cx='32' cy='16' r='6' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23facc15'/%3E%3Ccircle cx='32' cy='48' r='6' fill='%2322c55e'/%3E%3C/svg%3E">
     <style>
-        :root { --primary-color: #4f46e5; --bg-color: #0f172a; --card-bg: #ffffff; --text-color: #334155; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--text-color); padding: 20px; }
-        .portal-container { background: var(--card-bg); width: 100%; max-width: 600px; padding: 2.5rem; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }
+        :root {
+            --primary-color: #4f46e5;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-color: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --input-bg: #ffffff;
+            --section-bg: #f8fafc;
+        }
+        [data-theme="dark"] {
+            --bg-color: #020617;
+            --card-bg: #1e293b;
+            --text-color: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #334155;
+            --input-bg: #0f172a;
+            --section-bg: #0f172a;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--text-color); padding: 20px; transition: background 0.3s; }
+        body[dir="rtl"] { font-family: 'Noto Nastaliq Urdu', 'Segoe UI', sans-serif; }
+        .portal-container { background: var(--card-bg); width: 100%; max-width: 600px; padding: 2.5rem; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; position: relative; }
+        .logo-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px; }
+        .logo-row svg { width: 38px; height: 38px; }
         h1 { margin: 0; color: var(--primary-color); }
         .form-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;}
-        input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--text-color); }
+        input { width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; box-sizing: border-box; background: var(--input-bg); color: var(--text-color); }
         .btn-main { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .btn-logout { background-color: #ef4444; margin-top: 20px; }
         .hidden { display: none; }
         .msg { padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none; font-size: 0.9rem; }
         .success { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
         .error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-        .switch-link { margin-top: 20px; font-size: 0.9rem; }
+        .switch-link { margin-top: 20px; font-size: 0.9rem; color: var(--muted); }
         .switch-link span { color: var(--primary-color); cursor: pointer; text-decoration: underline; }
-        
-        .vehicle-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 20px; text-align: left; }
-        .vehicle-badge { display: inline-block; background: var(--primary-color); color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; margin-right: 10px; margin-top: 5px; border: 2px solid #312e81;}
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; text-align: left; }
-        th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; }
-        th { background-color: #f8fafc; }
+
+        .vehicle-box { background: var(--section-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-top: 20px; text-align: left; }
+        .vehicle-badge { display: inline-block; background: var(--primary-color); color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; letter-spacing: 1px; margin-right: 10px; margin-top: 5px; border: 2px solid #312e81; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; text-align: left; color: var(--text-color); }
+        th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+        th { background-color: var(--section-bg); }
         .status-unpaid { color: #dc2626; font-weight: bold; }
         .status-paid { color: #166534; font-weight: bold; }
 
+        /* Top-right toolbar */
+        .toolbar { position: absolute; top: 14px; right: 14px; display: flex; gap: 6px; }
+        .icon-btn { background: var(--section-bg); border: 1px solid var(--border); color: var(--text-color); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: var(--primary-color); color: white; }
+
+        /* Skeleton loaders */
+        .skeleton { background: linear-gradient(90deg, var(--border) 25%, var(--section-bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .skel-bar { height: 14px; margin: 8px 0; }
+
         /* Payment Modal */
         .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:1000; justify-content:center; align-items:center; padding:20px; box-sizing:border-box; }
-        .modal-box { background:white; border-radius:16px; padding:1.5rem; width:100%; max-width:370px; box-shadow:0 25px 50px rgba(0,0,0,0.4); }
+        .modal-box { background:var(--card-bg); color:var(--text-color); border-radius:16px; padding:1.5rem; width:100%; max-width:370px; box-shadow:0 25px 50px rgba(0,0,0,0.4); }
         .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
         .modal-header h3 { margin:0; color:var(--primary-color); }
-        .modal-close { background:none; border:none; font-size:1.3rem; cursor:pointer; color:#94a3b8; line-height:1; }
-        .pay-summary { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:18px; }
+        .modal-close { background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted); line-height:1; }
+        .pay-summary { background:var(--section-bg); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:18px; }
         .pay-summary-amount { font-size:1.6rem; font-weight:800; color:var(--primary-color); margin-top:4px; }
         .card-row { display:flex; gap:10px; }
         .card-row .form-group { flex:1; }
-        .card-brand { float:right; font-size:0.75rem; color:#64748b; margin-top:-20px; }
-        .spinner { width:38px; height:38px; border:4px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 12px; }
+        .spinner { width:38px; height:38px; border:4px solid var(--border); border-top-color:var(--primary-color); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 12px; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .check-icon { font-size:3.5rem; display:block; text-align:center; animation:popIn 0.4s ease; }
         @keyframes popIn { 0%{transform:scale(0.3);opacity:0} 70%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
         .btn-pay { background:linear-gradient(135deg,#4f46e5,#7c3aed); font-size:1rem; letter-spacing:0.3px; }
-        .btn-pay:hover { opacity:0.92; }
+
+        /* Chatbot widget */
+        .chat-fab { position: fixed; bottom: 24px; right: 24px; width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg,#4f46e5,#7c3aed); color: white; border: none; font-size: 1.6rem; cursor: pointer; box-shadow: 0 10px 25px rgba(79,70,229,0.5); z-index: 900; }
+        .chat-panel { position: fixed; bottom: 100px; right: 24px; width: 340px; max-width: calc(100vw - 30px); height: 460px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); display: none; flex-direction: column; overflow: hidden; z-index: 901; border: 1px solid var(--border); }
+        .chat-panel.open { display: flex; }
+        .chat-header { background: linear-gradient(135deg,#4f46e5,#7c3aed); color: white; padding: 14px 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .chat-messages { flex: 1; padding: 14px; overflow-y: auto; background: var(--section-bg); display: flex; flex-direction: column; gap: 10px; }
+        .chat-msg { padding: 10px 14px; border-radius: 12px; max-width: 80%; font-size: 0.88rem; line-height: 1.4; }
+        .chat-msg.user { align-self: flex-end; background: var(--primary-color); color: white; border-bottom-right-radius: 4px; }
+        .chat-msg.bot { align-self: flex-start; background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .chat-input-row { display: flex; padding: 10px; gap: 6px; border-top: 1px solid var(--border); background: var(--card-bg); }
+        .chat-input-row input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text-color); }
+        .chat-input-row button { padding: 8px 14px; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin: 0 2px; animation: bounce 1s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
     </style>
 </head>
 <body>
 
     <div class="portal-container">
-        <h1>Citizen Portal</h1>
-        <p>Manage your vehicles and challans</p>
-        <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;">
+        <div class="toolbar">
+            <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
+            <button class="icon-btn" onclick="toggleLang()" title="Toggle language" id="lang-btn">EN</button>
+        </div>
+
+        <div class="logo-row">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="4" width="24" height="56" rx="6" fill="#334155"/><circle cx="32" cy="16" r="6" fill="#ef4444"/><circle cx="32" cy="32" r="6" fill="#facc15"/><circle cx="32" cy="48" r="6" fill="#22c55e"/></svg>
+            <h1 data-i18n="title">Citizen Portal</h1>
+        </div>
+        <p data-i18n="subtitle">Manage your vehicles and challans</p>
+        <hr style="border-top: 1px solid var(--border); margin: 20px 0;">
 
         <div id="msg-box" class="msg"></div>
 
         <div id="login-section">
-            <div class="form-group"><label>CNIC Number</label><input type="text" id="login-nic" placeholder="42201-1234567-1"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="login-pass"></div>
-            <button class="btn-main" onclick="handleLogin()">Log In</button>
-            <div class="switch-link">Not registered? <span onclick="toggleView('register-section')">Create Account</span></div>
-            <div class="switch-link" style="margin-top: 6px;">Forgot password? <span onclick="toggleView('forgot-section')">Reset via WhatsApp</span></div>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-            <div style="text-align: center; font-size: 0.9rem; color: #64748b;">
-                Are you an Officer? <a href="/officer" style="color: #dc2626; font-weight: 600; text-decoration: none;">Click Here</a>
+            <div class="form-group"><label data-i18n="cnic">CNIC Number</label><input type="text" id="login-nic" placeholder="42201-1234567-1"></div>
+            <div class="form-group"><label data-i18n="password">Password</label><input type="password" id="login-pass"></div>
+            <button class="btn-main" onclick="handleLogin()" data-i18n="login">Log In</button>
+            <div class="switch-link"><span data-i18n="not_registered">Not registered?</span> <span onclick="toggleView('register-section')" data-i18n="create_account">Create Account</span></div>
+            <div class="switch-link" style="margin-top: 6px;"><span data-i18n="forgot_pass">Forgot password?</span> <span onclick="toggleView('forgot-section')" data-i18n="reset_whatsapp">Reset via WhatsApp</span></div>
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+            <div style="text-align: center; font-size: 0.9rem; color: var(--muted);">
+                <span data-i18n="are_officer">Are you an Officer?</span> <a href="/officer" style="color: #dc2626; font-weight: 600; text-decoration: none;" data-i18n="click_here">Click Here</a>
             </div>
         </div>
 
         <div id="register-section" class="hidden">
-            <div class="form-group"><label>Full Name</label><input type="text" id="reg-name"></div>
-            <div class="form-group"><label>Phone Number</label><input type="tel" id="reg-phone" placeholder="923001234567"></div>
-            <div class="form-group"><label>CNIC Number</label><input type="text" id="reg-nic" placeholder="42201-1234567-1"></div>
-            <div class="form-group"><label>Create Password</label><input type="password" id="reg-pass"></div>
-            <button class="btn-main" onclick="handleRegister()">Register</button>
-            <div class="switch-link">Have an account? <span onclick="toggleView('login-section')">Log In</span></div>
+            <div class="form-group"><label data-i18n="full_name">Full Name</label><input type="text" id="reg-name"></div>
+            <div class="form-group"><label data-i18n="phone">Phone Number</label><input type="tel" id="reg-phone" placeholder="923001234567"></div>
+            <div class="form-group"><label data-i18n="cnic">CNIC Number</label><input type="text" id="reg-nic" placeholder="42201-1234567-1"></div>
+            <div class="form-group"><label data-i18n="create_pass">Create Password</label><input type="password" id="reg-pass"></div>
+            <button class="btn-main" onclick="handleRegister()" data-i18n="register">Register</button>
+            <div class="switch-link"><span data-i18n="have_account">Have an account?</span> <span onclick="toggleView('login-section')" data-i18n="login">Log In</span></div>
         </div>
 
         <div id="forgot-section" class="hidden">
-            <h3 style="color: var(--primary-color); margin-top: 0;">Reset Password</h3>
+            <h3 style="color: var(--primary-color); margin-top: 0;" data-i18n="reset_password">Reset Password</h3>
             <div id="otp-step-1">
-                <div class="form-group"><label>CNIC Number</label><input type="text" id="forgot-nic" placeholder="42201-1234567-1"></div>
-                <button class="btn-main" onclick="sendOTP()">Send OTP via WhatsApp</button>
+                <div class="form-group"><label data-i18n="cnic">CNIC Number</label><input type="text" id="forgot-nic" placeholder="42201-1234567-1"></div>
+                <button class="btn-main" onclick="sendOTP()" data-i18n="send_otp">Send OTP via WhatsApp</button>
             </div>
             <div id="otp-step-2" class="hidden">
-                <div class="form-group"><label>Enter OTP (6 digits)</label><input type="text" id="otp-code" placeholder="123456" maxlength="6"></div>
-                <div class="form-group"><label>New Password</label><input type="password" id="new-pass"></div>
-                <button class="btn-main" onclick="resetPassword()">Reset Password</button>
+                <div class="form-group"><label data-i18n="enter_otp">Enter OTP (6 digits)</label><input type="text" id="otp-code" placeholder="123456" maxlength="6"></div>
+                <div class="form-group"><label data-i18n="new_password">New Password</label><input type="password" id="new-pass"></div>
+                <button class="btn-main" onclick="resetPassword()" data-i18n="reset_password">Reset Password</button>
             </div>
-            <div class="switch-link"><span onclick="toggleView('login-section')">← Back to Login</span></div>
+            <div class="switch-link"><span onclick="toggleView('login-section')" data-i18n="back_login">← Back to Login</span></div>
         </div>
 
         <div id="dashboard-section" class="hidden">
-            <h2 style="color: var(--primary-color);">Welcome, <span id="user-name-display"></span></h2>
-            
+            <h2 style="color: var(--primary-color);"><span data-i18n="welcome">Welcome,</span> <span id="user-name-display"></span></h2>
+
             <div class="vehicle-box">
-                <h4 style="margin: 0 0 10px 0; color: var(--primary-color);">🚗 Officially Registered Vehicles</h4>
-                <div id="vehicle-list" style="margin-bottom: 5px;"></div>
+                <h4 style="margin: 0 0 10px 0; color: var(--primary-color);">🚗 <span data-i18n="registered_vehicles">Officially Registered Vehicles</span></h4>
+                <div id="vehicle-list" style="margin-bottom: 5px;">
+                    <div class="skeleton skel-bar" style="width:60%;"></div>
+                    <div class="skeleton skel-bar" style="width:40%;"></div>
+                </div>
             </div>
 
-            <div id="challan-counter" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;"></div>
+            <div id="challan-counter" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <div class="skeleton" style="height:64px;flex:1;"></div>
+                <div class="skeleton" style="height:64px;flex:1;"></div>
+                <div class="skeleton" style="height:64px;flex:1;"></div>
+            </div>
 
-            <h3 style="text-align: left; margin-top: 25px;">Your Challans</h3>
+            <h3 style="text-align: left; margin-top: 25px;" data-i18n="your_challans">Your Challans</h3>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
-                            <th>Challan #</th>
-                            <th>Vehicle</th>
-                            <th>Violation</th>
-                            <th>Fine</th>
-                            <th>Status</th>
-                            <th>Action</th>
+                            <th data-i18n="challan_num">Challan #</th>
+                            <th data-i18n="vehicle">Vehicle</th>
+                            <th data-i18n="violation">Violation</th>
+                            <th data-i18n="fine">Fine</th>
+                            <th data-i18n="status">Status</th>
+                            <th data-i18n="action">Action</th>
                         </tr>
                     </thead>
                     <tbody id="challan-table-body">
+                        <tr><td colspan="6"><div class="skeleton skel-bar"></div><div class="skeleton skel-bar" style="width:80%;"></div></td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <button class="btn-main btn-logout" onclick="handleLogout()">Log Out</button>
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
-                <a href="/officer" style="flex:1; display: block; text-align: center; background: #dc2626; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
-                    Officer Portal →
-                </a>
-                <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
-                    📊 Statistics
-                </a>
+            <button class="btn-main btn-logout" onclick="handleLogout()" data-i18n="logout">Log Out</button>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; gap: 10px;">
+                <a href="/officer" style="flex:1; display: block; text-align: center; background: #dc2626; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;" data-i18n="officer_portal">Officer Portal →</a>
+                <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">📊 <span data-i18n="statistics">Statistics</span></a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chatbot FAB + panel -->
+    <button class="chat-fab" onclick="toggleChat()" title="Chat assistant">💬</button>
+    <div class="chat-panel" id="chat-panel">
+        <div class="chat-header">
+            <span>🤖 TrafficGuard Assistant</span>
+            <span style="cursor:pointer;" onclick="toggleChat()">✕</span>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+            <input id="chat-input" type="text" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendChat()">
+            <button onclick="sendChat()">Send</button>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal-overlay" onclick="if(event.target===this)closePayment()">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>💳 <span data-i18n="pay_challan">Pay Challan</span></h3>
+                <button class="modal-close" onclick="closePayment()">✕</button>
+            </div>
+            <div class="pay-summary">
+                <div style="font-size:0.8rem;color:var(--muted);">Challan # <strong id="pm-challan"></strong></div>
+                <div style="font-size:0.85rem;margin-top:2px;" id="pm-violation"></div>
+                <div class="pay-summary-amount" id="pm-amount"></div>
+            </div>
+            <div id="pm-form">
+                <div class="form-group">
+                    <label data-i18n="card_number">Card Number <span id="pm-brand" style="float:right;color:var(--muted);font-size:0.75rem;font-weight:normal;"></span></label>
+                    <input id="pm-card" type="text" placeholder="1234 5678 9012 3456" maxlength="19">
+                </div>
+                <div class="card-row">
+                    <div class="form-group"><label data-i18n="expiry">Expiry</label><input id="pm-expiry" type="text" placeholder="MM/YY" maxlength="5"></div>
+                    <div class="form-group"><label>CVV</label><input id="pm-cvv" type="password" placeholder="•••" maxlength="4"></div>
+                </div>
+                <div class="form-group"><label data-i18n="cardholder">Cardholder Name</label><input id="pm-name" type="text" placeholder="Name on card"></div>
+                <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin:8px 0;">🔒 Demo mode — test card <strong>4242 4242 4242 4242</strong></p>
+                <button class="btn-main btn-pay" onclick="processPayment()">Pay <span id="pm-btn-label"></span></button>
+            </div>
+            <div id="pm-processing" style="display:none;text-align:center;padding:20px 0;">
+                <div class="spinner"></div>
+                <p style="color:var(--muted);font-weight:600;margin:0;" data-i18n="processing">Processing payment...</p>
+            </div>
+            <div id="pm-success" style="display:none;text-align:center;padding:10px 0;">
+                <span class="check-icon">✅</span>
+                <h3 style="color:#166534;margin:10px 0 4px;" data-i18n="pay_success">Payment Successful!</h3>
+                <p id="pm-success-amount" style="font-size:1.2rem;font-weight:bold;color:var(--primary-color);margin:0;"></p>
+                <p style="color:var(--muted);font-size:0.85rem;margin-top:8px;" data-i18n="paid_marked">Challan marked as PAID</p>
             </div>
         </div>
     </div>
 
     <script>
+        // ── i18n ────────────────────────────────────────
+        const i18n = {
+            en: {
+                title: "Citizen Portal", subtitle: "Manage your vehicles and challans",
+                cnic: "CNIC Number", password: "Password", login: "Log In",
+                not_registered: "Not registered?", create_account: "Create Account",
+                forgot_pass: "Forgot password?", reset_whatsapp: "Reset via WhatsApp",
+                are_officer: "Are you an Officer?", click_here: "Click Here",
+                full_name: "Full Name", phone: "Phone Number", create_pass: "Create Password",
+                register: "Register", have_account: "Have an account?",
+                reset_password: "Reset Password", send_otp: "Send OTP via WhatsApp",
+                enter_otp: "Enter OTP (6 digits)", new_password: "New Password", back_login: "← Back to Login",
+                welcome: "Welcome,", registered_vehicles: "Officially Registered Vehicles",
+                your_challans: "Your Challans", challan_num: "Challan #", vehicle: "Vehicle",
+                violation: "Violation", fine: "Fine", status: "Status", action: "Action",
+                logout: "Log Out", officer_portal: "Officer Portal →", statistics: "Statistics",
+                pay_challan: "Pay Challan", card_number: "Card Number", expiry: "Expiry",
+                cardholder: "Cardholder Name", processing: "Processing payment...",
+                pay_success: "Payment Successful!", paid_marked: "Challan marked as PAID"
+            },
+            ur: {
+                title: "شہری پورٹل", subtitle: "اپنی گاڑیوں اور چالان کا انتظام کریں",
+                cnic: "شناختی کارڈ نمبر", password: "پاس ورڈ", login: "لاگ ان",
+                not_registered: "رجسٹرڈ نہیں؟", create_account: "اکاؤنٹ بنائیں",
+                forgot_pass: "پاس ورڈ بھول گئے؟", reset_whatsapp: "واٹس ایپ سے ری سیٹ کریں",
+                are_officer: "کیا آپ افسر ہیں؟", click_here: "یہاں کلک کریں",
+                full_name: "پورا نام", phone: "فون نمبر", create_pass: "پاس ورڈ بنائیں",
+                register: "رجسٹر", have_account: "اکاؤنٹ موجود ہے؟",
+                reset_password: "پاس ورڈ ری سیٹ", send_otp: "OTP بھیجیں",
+                enter_otp: "OTP درج کریں (6 ہندسے)", new_password: "نیا پاس ورڈ", back_login: "← لاگ ان پر واپس",
+                welcome: "خوش آمدید،", registered_vehicles: "رجسٹرڈ گاڑیاں",
+                your_challans: "آپ کے چالان", challan_num: "چالان نمبر", vehicle: "گاڑی",
+                violation: "خلاف ورزی", fine: "جرمانہ", status: "حالت", action: "عمل",
+                logout: "لاگ آؤٹ", officer_portal: "افسر پورٹل →", statistics: "اعدادوشمار",
+                pay_challan: "چالان ادا کریں", card_number: "کارڈ نمبر", expiry: "میعاد",
+                cardholder: "کارڈ ہولڈر کا نام", processing: "ادائیگی ہو رہی ہے...",
+                pay_success: "ادائیگی کامیاب!", paid_marked: "چالان ادا شدہ"
+            }
+        };
+
+        function applyLang(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) el.innerText = i18n[lang][key];
+            });
+            document.body.setAttribute('dir', lang === 'ur' ? 'rtl' : 'ltr');
+            document.getElementById('lang-btn').innerText = lang === 'ur' ? 'اردو' : 'EN';
+            localStorage.setItem('lang', lang);
+        }
+
+        function toggleLang() {
+            const cur = localStorage.getItem('lang') || 'en';
+            applyLang(cur === 'en' ? 'ur' : 'en');
+        }
+
+        // ── Theme ─────────────────────────────────────
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('theme-btn').innerText = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('theme', theme);
+        }
+
+        function toggleTheme() {
+            const cur = localStorage.getItem('theme') || 'light';
+            applyTheme(cur === 'light' ? 'dark' : 'light');
+        }
+
+        // ── Bootstrap ────────────────────────────────
         const msgBox = document.getElementById('msg-box');
-        
+
         window.onload = function() {
+            applyTheme(localStorage.getItem('theme') || 'light');
+            applyLang(localStorage.getItem('lang') || 'en');
             if (localStorage.getItem('userNic')) { loadDashboard(); }
         };
 
@@ -163,12 +344,8 @@
             };
             const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             const result = await res.json();
-            if (res.ok) { 
-                showMessage(result.message); 
-                toggleView('login-section'); 
-            } else { 
-                showMessage(result.message, true); 
-            }
+            if (res.ok) { showMessage(result.message); toggleView('login-section'); }
+            else { showMessage(result.message, true); }
         }
 
         async function handleLogin() {
@@ -176,7 +353,6 @@
             const pass = document.getElementById('login-pass').value;
             const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nic, password: pass}) });
             const result = await res.json();
-            
             if (res.ok) {
                 localStorage.setItem('userNic', nic);
                 localStorage.setItem('userName', result.name);
@@ -188,10 +364,10 @@
             toggleView('dashboard-section');
             const nic = localStorage.getItem('userNic');
             document.getElementById('user-name-display').innerText = localStorage.getItem('userName') || "Citizen";
-            
+
             const res = await fetch(`/api/my-challans/${nic}`);
             const data = await res.json();
-            
+
             const vehicleList = document.getElementById('vehicle-list');
             vehicleList.innerHTML = "";
             if (data.vehicles && data.vehicles.length > 0) {
@@ -199,16 +375,16 @@
                     vehicleList.innerHTML += `<span class="vehicle-badge">${v} <span onclick="removeVehicle('${v}')" title="Remove vehicle" style="cursor:pointer;opacity:0.75;margin-left:6px;font-size:0.8rem;">✕</span></span>`;
                 });
             } else {
-                vehicleList.innerHTML = `<span style="color: #64748b; font-size: 0.9rem;">No vehicles found attached to this CNIC in the official database.</span>`;
+                vehicleList.innerHTML = `<span style="color: var(--muted); font-size: 0.9rem;">No vehicles found in the official database for this CNIC.</span>`;
             }
 
             const challans = data.challans || [];
             const unpaidCount = challans.filter(c => c.status === 'UNPAID').length;
             const amountDue = challans.filter(c => c.status === 'UNPAID').reduce((s, c) => s + c.fine, 0);
             document.getElementById('challan-counter').innerHTML = `
-                <div style="background:#f1f5f9;padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
-                    <div style="font-size:1.6rem;font-weight:bold;color:#334155;">${challans.length}</div>
-                    <div style="font-size:0.75rem;color:#64748b;">Total Challans</div>
+                <div style="background:var(--section-bg);padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
+                    <div style="font-size:1.6rem;font-weight:bold;color:var(--text-color);">${challans.length}</div>
+                    <div style="font-size:0.75rem;color:var(--muted);">Total Challans</div>
                 </div>
                 <div style="background:#fee2e2;padding:12px 15px;border-radius:8px;flex:1;text-align:center;">
                     <div style="font-size:1.6rem;font-weight:bold;color:#dc2626;">${unpaidCount}</div>
@@ -221,10 +397,10 @@
             `;
 
             const tbody = document.getElementById('challan-table-body');
-            tbody.innerHTML = ""; 
-            
-            if(data.challans && data.challans.length > 0) {
-                data.challans.forEach(c => {
+            tbody.innerHTML = "";
+
+            if (challans.length > 0) {
+                challans.forEach(c => {
                     const statusClass = c.status === "UNPAID" ? "status-unpaid" : "status-paid";
                     tbody.innerHTML += `
                         <tr>
@@ -237,16 +413,16 @@
                                 ${c.status === 'UNPAID' ? `<button onclick="openPayment('${c.challan_number}',${c.fine},'${c.violation_type}')" style="background:#4f46e5;color:white;border:none;padding:5px 9px;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:bold;margin-right:4px;">💳 Pay</button>` : ''}
                                 <a href="/api/download-challan/${c.challan_number}" target="_blank" style="background:#64748b;color:white;padding:5px 9px;border-radius:4px;text-decoration:none;font-size:0.75rem;font-weight:bold;">PDF</a>
                             </td>
-                        </tr>
-                    `;
+                        </tr>`;
                 });
             } else {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No challans found for your vehicles. Great job!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No challans found. Great job!</td></tr>`;
             }
         }
 
         function handleLogout() {
-            localStorage.clear();
+            localStorage.removeItem('userNic');
+            localStorage.removeItem('userName');
             document.getElementById('login-nic').value = '';
             document.getElementById('login-pass').value = '';
             toggleView('login-section');
@@ -290,19 +466,15 @@
             }
         }
 
-        // ── Payment Modal ──────────────────────────────
+        // ── Payment Modal ─────────────────────────────
         let _payingChallan = null;
-
         function openPayment(challanNo, amount, violation) {
             _payingChallan = { challanNo, amount, violation };
             document.getElementById('pm-challan').innerText = challanNo;
             document.getElementById('pm-violation').innerText = violation;
             document.getElementById('pm-amount').innerText = 'PKR ' + Number(amount).toLocaleString();
             document.getElementById('pm-btn-label').innerText = 'PKR ' + Number(amount).toLocaleString();
-            document.getElementById('pm-card').value = '';
-            document.getElementById('pm-expiry').value = '';
-            document.getElementById('pm-cvv').value = '';
-            document.getElementById('pm-name').value = '';
+            ['pm-card','pm-expiry','pm-cvv','pm-name'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('pm-brand').innerText = '';
             document.getElementById('pm-form').style.display = 'block';
             document.getElementById('pm-processing').style.display = 'none';
@@ -315,7 +487,6 @@
             _payingChallan = null;
         }
 
-        // Format card number with spaces
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pm-card').addEventListener('input', function() {
                 let v = this.value.replace(/\D/g,'').substring(0,16);
@@ -349,7 +520,6 @@
             const expiry = document.getElementById('pm-expiry').value;
             const cvv = document.getElementById('pm-cvv').value;
             const name = document.getElementById('pm-name').value.trim();
-
             if (!luhn(card)) { alert('Invalid card number.'); return; }
             const parts = expiry.split('/');
             if (parts.length !== 2 || parts[0] < 1 || parts[0] > 12) { alert('Invalid expiry date.'); return; }
@@ -362,10 +532,9 @@
 
             document.getElementById('pm-form').style.display = 'none';
             document.getElementById('pm-processing').style.display = 'block';
-
             await new Promise(r => setTimeout(r, 2200));
 
-            const res = await fetch(`/api/challan/${_payingChallan.challanNo}/pay`, { method: 'PATCH' });
+            const res = await fetch(`/api/challan/${_payingChallan.challanNo}/pay?by=citizen`, { method: 'PATCH' });
             if (res.ok) {
                 document.getElementById('pm-processing').style.display = 'none';
                 document.getElementById('pm-success').style.display = 'block';
@@ -377,57 +546,56 @@
                 alert('Payment failed. Please try again.');
             }
         }
+
+        // ── Chatbot ────────────────────────────────────
+        const chatHistory = [];
+        function toggleChat() {
+            const panel = document.getElementById('chat-panel');
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open') && chatHistory.length === 0) {
+                addChatMsg('bot', "Hi! I'm TrafficGuard Assistant. Ask me about challans, payments, or how to use the portal.");
+            }
+        }
+
+        function addChatMsg(role, text) {
+            const box = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + (role === 'user' ? 'user' : 'bot');
+            div.innerText = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            addChatMsg('user', msg);
+            chatHistory.push({ role: 'user', content: msg });
+            input.value = '';
+
+            const box = document.getElementById('chat-messages');
+            const typing = document.createElement('div');
+            typing.className = 'chat-msg bot';
+            typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+            box.appendChild(typing);
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                const res = await fetch('/api/chatbot', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: msg, history: chatHistory.slice(0,-1) }) });
+                typing.remove();
+                const data = await res.json();
+                if (res.ok) {
+                    addChatMsg('bot', data.reply);
+                    chatHistory.push({ role: 'assistant', content: data.reply });
+                } else {
+                    addChatMsg('bot', '⚠️ ' + (data.message || 'Error'));
+                }
+            } catch (e) {
+                typing.remove();
+                addChatMsg('bot', '⚠️ Connection error.');
+            }
+        }
     </script>
-
-    <!-- Payment Modal -->
-    <div id="payment-modal" class="modal-overlay" onclick="if(event.target===this)closePayment()">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>💳 Pay Challan</h3>
-                <button class="modal-close" onclick="closePayment()">✕</button>
-            </div>
-
-            <div class="pay-summary">
-                <div style="font-size:0.8rem;color:#64748b;">Challan # <strong id="pm-challan"></strong></div>
-                <div style="font-size:0.85rem;color:#334155;margin-top:2px;" id="pm-violation"></div>
-                <div class="pay-summary-amount" id="pm-amount"></div>
-            </div>
-
-            <div id="pm-form">
-                <div class="form-group">
-                    <label>Card Number <span id="pm-brand" style="float:right;color:#64748b;font-size:0.75rem;font-weight:normal;"></span></label>
-                    <input id="pm-card" type="text" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number">
-                </div>
-                <div class="card-row">
-                    <div class="form-group">
-                        <label>Expiry</label>
-                        <input id="pm-expiry" type="text" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
-                    </div>
-                    <div class="form-group">
-                        <label>CVV</label>
-                        <input id="pm-cvv" type="password" placeholder="•••" maxlength="4" autocomplete="cc-csc">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Cardholder Name</label>
-                    <input id="pm-name" type="text" placeholder="Name on card" autocomplete="cc-name">
-                </div>
-                <p style="font-size:0.75rem;color:#94a3b8;text-align:center;margin:8px 0;">🔒 Demo mode — use test card <strong>4242 4242 4242 4242</strong></p>
-                <button class="btn-main btn-pay" onclick="processPayment()">Pay <span id="pm-btn-label"></span></button>
-            </div>
-
-            <div id="pm-processing" style="display:none;text-align:center;padding:20px 0;">
-                <div class="spinner"></div>
-                <p style="color:#64748b;font-weight:600;margin:0;">Processing payment...</p>
-            </div>
-
-            <div id="pm-success" style="display:none;text-align:center;padding:10px 0;">
-                <span class="check-icon">✅</span>
-                <h3 style="color:#166534;margin:10px 0 4px;">Payment Successful!</h3>
-                <p id="pm-success-amount" style="font-size:1.2rem;font-weight:bold;color:#4f46e5;margin:0;"></p>
-                <p style="color:#64748b;font-size:0.85rem;margin-top:8px;">Challan marked as PAID</p>
-            </div>
-        </div>
-    </div>
 </body>
 </html>

@@ -4,104 +4,255 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Officer Portal - TrafficGuard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='20' y='4' width='24' height='56' rx='6' fill='%23334155'/%3E%3Ccircle cx='32' cy='16' r='6' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23facc15'/%3E%3Ccircle cx='32' cy='48' r='6' fill='%2322c55e'/%3E%3C/svg%3E">
     <style>
-        :root { --primary-color: #dc2626; --primary-hover: #b91c1c; --bg-color: #0f172a; --card-bg: #ffffff; --text-color: #334155;}
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px;}
-        .container { background: var(--card-bg); max-width: 450px; width: 100%; padding: 2.5rem; border-radius: 16px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        :root {
+            --primary-color: #dc2626;
+            --primary-hover: #b91c1c;
+            --bg-color: #0f172a;
+            --card-bg: #ffffff;
+            --text-color: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --section-bg: #f8fafc;
+            --input-bg: #ffffff;
+        }
+        [data-theme="dark"] {
+            --bg-color: #020617;
+            --card-bg: #1e293b;
+            --text-color: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #334155;
+            --section-bg: #0f172a;
+            --input-bg: #0f172a;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; color: var(--text-color); }
+        .container { background: var(--card-bg); max-width: 500px; width: 100%; padding: 2.5rem; border-radius: 16px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); position: relative; }
+        .logo-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 5px; }
+        .logo-row svg { width: 38px; height: 38px; }
         h1 { margin: 0; color: var(--primary-color); }
         .form-group { margin-top: 20px; text-align: left; }
-        input[type="file"] { width: 100%; padding: 10px; border: 2px dashed #cbd5e1; border-radius: 8px; margin-bottom: 10px; }
+        label { font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 5px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; box-sizing: border-box; background: var(--input-bg); color: var(--text-color); }
+        input[type="file"] { width: 100%; padding: 10px; border: 2px dashed var(--border); border-radius: 8px; margin-bottom: 10px; background: var(--input-bg); color: var(--text-color); }
         .btn-main { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
         .btn-main:hover { background-color: var(--primary-hover); }
         .loading { display: none; color: var(--primary-color); font-weight: bold; margin-top: 15px; }
-        .result-box { background-color: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 20px; text-align: left; }
+        .result-box { background-color: var(--section-bg); border: 2px solid var(--border); border-radius: 8px; padding: 15px; margin-top: 20px; text-align: left; }
         .result-box img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
-        .error { color: #dc2626; font-weight: bold; margin-top: 15px; }
+        .error { color: var(--primary-color); font-weight: bold; margin-top: 15px; }
+        .hidden { display: none; }
+        .toolbar { position: absolute; top: 14px; right: 14px; display: flex; gap: 6px; }
+        .icon-btn { background: var(--section-bg); border: 1px solid var(--border); color: var(--text-color); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: var(--primary-color); color: white; }
+        .badge-info { background: var(--section-bg); padding: 8px 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+        .skel-bar { height: 14px; background: linear-gradient(90deg, var(--border) 25%, var(--section-bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; margin: 8px 0; }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Traffic Police Terminal</h1>
-        <p>AI Video Scanner</p>
-        <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;">
-
-        <div class="form-group">
-            <label style="font-weight: bold;">Upload Dashcam/CCTV Video</label>
-            <form action="/process-video" method="POST" enctype="multipart/form-data" onsubmit="document.getElementById('loading').style.display='block';">
-                <input type="file" name="video" accept="video/*" required>
-                <button type="submit" class="btn-main">Scan For Violations</button>
-            </form>
-            <div id="loading" class="loading">🔄 AI is processing video...</div>
+        <div class="toolbar">
+            <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
+            <button class="icon-btn" onclick="toggleLang()" title="Toggle language" id="lang-btn">EN</button>
         </div>
 
-        {% if error %}
-            <div class="error">⚠️ {{ error }}</div>
-        {% endif %}
-
-        {% if result %}
-        <div class="result-box">
-            <h3 style="margin-top:0; color: #dc2626;">🚨 Violation Detected</h3>
-            <img src="data:image/jpeg;base64,{{ result.violation_image }}" alt="Violation Frame">
-            <p><strong>Plate:</strong> {{ result.number_plate }}</p>
-            <p><strong>Vehicle Type:</strong> {{ result.vehicle }}</p>
-
-            <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
-            <p><strong>Registered Owner:</strong> {{ result.owner_name or "Not Registered" }}</p>
-            <p><strong>Owner CNIC:</strong> {{ result.owner_nic or "N/A" }}</p>
-            <hr style="border-top: 1px dashed #cbd5e1; margin: 10px 0;">
-
-            <p><strong>Violation:</strong> {{ result.type }}</p>
-            <p><strong>Fine Amount:</strong> PKR {{ result.fine }}</p>
-            {% if result.challan_number %}
-            <p><strong>Challan #:</strong> {{ result.challan_number }}</p>
-            <button onclick="markPaid('{{ result.challan_number }}')" id="pay-btn" style="width:100%;padding:10px;background:#166534;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-top:5px;">✅ Mark as PAID</button>
-            {% endif %}
-            <p style="font-size: 0.8rem; color: #64748b; margin-top: 10px;">System Log: {{ result.notification_status }}</p>
+        <div class="logo-row">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="4" width="24" height="56" rx="6" fill="#334155"/><circle cx="32" cy="16" r="6" fill="#ef4444"/><circle cx="32" cy="32" r="6" fill="#facc15"/><circle cx="32" cy="48" r="6" fill="#22c55e"/></svg>
+            <h1 data-i18n="title">Traffic Police Terminal</h1>
         </div>
-        {% endif %}
+        <p data-i18n="subtitle">AI Video Scanner</p>
+        <hr style="border-top: 1px solid var(--border); margin: 20px 0;">
 
-        <div class="form-group" style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-            <label style="font-weight: bold; display: block; margin-bottom: 8px;">🔍 Search by Plate Number</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="search-plate-input" placeholder="e.g. KHI1234" style="flex:1; padding:10px; border:2px solid #e2e8f0; border-radius:8px; font-size:1rem;">
-                <button onclick="searchPlate()" class="btn-main" style="width:auto; padding:10px 18px;">Search</button>
+        <!-- Officer Login -->
+        <div id="officer-login" class="hidden">
+            <h3 style="color: var(--primary-color); margin-top: 0;" data-i18n="officer_login">🔐 Officer Login</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);" data-i18n="login_required">Authorized personnel only.</p>
+            <div class="form-group"><label data-i18n="username">Username</label><input type="text" id="off-user" placeholder="officer"></div>
+            <div class="form-group"><label data-i18n="password">Password</label><input type="password" id="off-pass" placeholder="••••••"></div>
+            <button class="btn-main" style="margin-top: 15px;" onclick="officerLogin()" data-i18n="login_btn">Log In</button>
+            <p style="font-size: 0.75rem; color: var(--muted); margin-top: 10px;">Default: <code>officer</code> / <code>admin123</code></p>
+            <div id="off-msg" style="margin-top: 10px; color: var(--primary-color); font-weight: bold;"></div>
+        </div>
+
+        <!-- Officer Workspace (gated) -->
+        <div id="officer-workspace" class="hidden">
+            <div class="badge-info">
+                <span>👮 <strong id="off-name"></strong> &nbsp;<span style="color: var(--muted);" id="off-badge"></span></span>
+                <button onclick="officerLogout()" style="background: none; border: none; color: var(--primary-color); cursor: pointer; font-weight: 600; font-size: 0.85rem;" data-i18n="logout">Log Out</button>
             </div>
-            <div id="search-result" style="margin-top: 12px;"></div>
+
+            <div class="form-group">
+                <label style="font-weight: bold;" data-i18n="upload_video">Upload Dashcam/CCTV Video</label>
+                <form action="/process-video" method="POST" enctype="multipart/form-data" onsubmit="document.getElementById('loading').style.display='block';">
+                    <input type="file" name="video" accept="video/*" required>
+                    <button type="submit" class="btn-main" data-i18n="scan_btn">Scan For Violations</button>
+                </form>
+                <div id="loading" class="loading">🔄 AI is processing video...</div>
+            </div>
+
+            {% if error %}
+                <div class="error">⚠️ {{ error }}</div>
+            {% endif %}
+
+            {% if result %}
+            <div class="result-box">
+                <h3 style="margin-top:0; color: var(--primary-color);">🚨 Violation Detected</h3>
+                <img src="data:image/jpeg;base64,{{ result.violation_image }}" alt="Violation Frame">
+                <p><strong>Plate:</strong> {{ result.number_plate }}</p>
+                <p><strong>Vehicle Type:</strong> {{ result.vehicle }}</p>
+                <hr style="border-top: 1px dashed var(--border); margin: 10px 0;">
+                <p><strong>Registered Owner:</strong> {{ result.owner_name or "Not Registered" }}</p>
+                <p><strong>Owner CNIC:</strong> {{ result.owner_nic or "N/A" }}</p>
+                <hr style="border-top: 1px dashed var(--border); margin: 10px 0;">
+                <p><strong>Violation:</strong> {{ result.type }}</p>
+                <p><strong>Fine Amount:</strong> PKR {{ result.fine }}</p>
+                {% if result.challan_number %}
+                <p><strong>Challan #:</strong> {{ result.challan_number }}</p>
+                <button onclick="markPaid('{{ result.challan_number }}')" id="pay-btn" style="width:100%;padding:10px;background:#166534;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-top:5px;">✅ Mark as PAID</button>
+                {% endif %}
+                <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">System Log: {{ result.notification_status }}</p>
+            </div>
+            {% endif %}
+
+            <div class="form-group" style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 8px;">🔍 <span data-i18n="search_plate">Search by Plate Number</span></label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="search-plate-input" placeholder="e.g. KHI1234" style="flex:1;">
+                    <button onclick="searchPlate()" class="btn-main" style="width:auto; padding:10px 18px;" data-i18n="search">Search</button>
+                </div>
+                <div id="search-result" style="margin-top: 12px;"></div>
+            </div>
+
+            <!-- Audit log -->
+            <div style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-weight: bold;">📜 <span data-i18n="audit_log">Recent Status Changes</span></label>
+                    <button onclick="loadAudit()" style="background: none; border: 1px solid var(--border); color: var(--text-color); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;" data-i18n="refresh">Refresh</button>
+                </div>
+                <div id="audit-list" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
+            </div>
         </div>
 
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
-            <a href="/" style="flex:1; display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
-                ← Citizen Portal
-            </a>
-            <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">
-                📊 Statistics
-            </a>
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; gap: 10px;">
+            <a href="/" style="flex:1; display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;" data-i18n="citizen_portal">← Citizen Portal</a>
+            <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">📊 <span data-i18n="statistics">Statistics</span></a>
         </div>
     </div>
 
     <script>
+        const i18n = {
+            en: {
+                title: "Traffic Police Terminal", subtitle: "AI Video Scanner",
+                officer_login: "🔐 Officer Login", login_required: "Authorized personnel only.",
+                username: "Username", password: "Password", login_btn: "Log In",
+                logout: "Log Out", upload_video: "Upload Dashcam/CCTV Video",
+                scan_btn: "Scan For Violations", search_plate: "Search by Plate Number",
+                search: "Search", audit_log: "Recent Status Changes", refresh: "Refresh",
+                citizen_portal: "← Citizen Portal", statistics: "Statistics"
+            },
+            ur: {
+                title: "ٹریفک پولیس ٹرمینل", subtitle: "AI ویڈیو اسکینر",
+                officer_login: "🔐 افسر لاگ ان", login_required: "صرف مجاز افراد۔",
+                username: "صارف نام", password: "پاس ورڈ", login_btn: "لاگ ان",
+                logout: "لاگ آؤٹ", upload_video: "ویڈیو اپ لوڈ کریں",
+                scan_btn: "خلاف ورزی اسکین کریں", search_plate: "نمبر پلیٹ تلاش کریں",
+                search: "تلاش", audit_log: "حالیہ تبدیلیاں", refresh: "ریفریش",
+                citizen_portal: "← شہری پورٹل", statistics: "اعدادوشمار"
+            }
+        };
+
+        function applyLang(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) el.innerText = i18n[lang][key];
+            });
+            document.body.setAttribute('dir', lang === 'ur' ? 'rtl' : 'ltr');
+            document.getElementById('lang-btn').innerText = lang === 'ur' ? 'اردو' : 'EN';
+            localStorage.setItem('lang', lang);
+        }
+
+        function toggleLang() {
+            const cur = localStorage.getItem('lang') || 'en';
+            applyLang(cur === 'en' ? 'ur' : 'en');
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('theme-btn').innerText = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('theme', theme);
+        }
+
+        function toggleTheme() {
+            const cur = localStorage.getItem('theme') || 'light';
+            applyTheme(cur === 'light' ? 'dark' : 'light');
+        }
+
+        // ── Officer auth ──────────────────────────────
+        function showOfficerWorkspace() {
+            document.getElementById('officer-login').classList.add('hidden');
+            document.getElementById('officer-workspace').classList.remove('hidden');
+            document.getElementById('off-name').innerText = localStorage.getItem('officerName') || 'Officer';
+            document.getElementById('off-badge').innerText = localStorage.getItem('officerBadge') || '';
+            loadAudit();
+        }
+
+        function showOfficerLogin() {
+            document.getElementById('officer-login').classList.remove('hidden');
+            document.getElementById('officer-workspace').classList.add('hidden');
+        }
+
+        async function officerLogin() {
+            const username = document.getElementById('off-user').value.trim();
+            const password = document.getElementById('off-pass').value;
+            const msg = document.getElementById('off-msg');
+            msg.innerText = '';
+            const res = await fetch('/api/officer-login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username, password }) });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('officerToken', username);
+                localStorage.setItem('officerName', data.name);
+                localStorage.setItem('officerBadge', data.badge_id);
+                showOfficerWorkspace();
+            } else {
+                msg.innerText = data.message;
+            }
+        }
+
+        function officerLogout() {
+            localStorage.removeItem('officerToken');
+            localStorage.removeItem('officerName');
+            localStorage.removeItem('officerBadge');
+            showOfficerLogin();
+        }
+
+        // ── Mark paid ─────────────────────────────────
         async function markPaid(challanNo) {
             if (!confirm(`Mark challan ${challanNo} as PAID?`)) return;
-            const res = await fetch(`/api/challan/${challanNo}/pay`, { method: 'PATCH' });
+            const by = localStorage.getItem('officerToken') || 'officer';
+            const res = await fetch(`/api/challan/${challanNo}/pay?by=${by}`, { method: 'PATCH' });
             const result = await res.json();
             alert(result.message);
             if (res.ok) {
                 const btn = document.getElementById('pay-btn');
                 if (btn) { btn.textContent = '✅ PAID'; btn.disabled = true; btn.style.background = '#9ca3af'; }
+                loadAudit();
             }
         }
 
+        // ── Search by plate ───────────────────────────
         async function searchPlate() {
             const plate = document.getElementById('search-plate-input').value.trim();
             const box = document.getElementById('search-result');
             if (!plate) { box.innerHTML = '<p style="color:#dc2626;">Enter a plate number.</p>'; return; }
-            box.innerHTML = '<p style="color:#64748b;">Searching...</p>';
+            box.innerHTML = '<div class="skel-bar"></div><div class="skel-bar" style="width:80%;"></div>';
             const res = await fetch(`/api/search-plate/${encodeURIComponent(plate)}`);
             const data = await res.json();
             if (!res.ok) { box.innerHTML = `<p style="color:#dc2626;">${data.message}</p>`; return; }
 
-            let rows = data.challans.map(c => `
+            const by = localStorage.getItem('officerToken') || 'officer';
+            const rows = data.challans.map(c => `
                 <tr>
                     <td>${c.challan_number}</td>
                     <td>${c.violation_type}</td>
@@ -110,14 +261,13 @@
                     <td>${c.issued_at}</td>
                     <td>${c.status==='UNPAID' ? `<button onclick="markPaid('${c.challan_number}')" style="background:#166534;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.75rem;">Mark Paid</button>` : '—'}</td>
                 </tr>`).join('');
-
             box.innerHTML = `
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+                <div style="background:var(--section-bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
                     <p style="margin:0 0 4px 0;"><strong>Owner:</strong> ${data.owner_name} &nbsp;|&nbsp; <strong>CNIC:</strong> ${data.owner_nic}</p>
-                    <p style="margin:0 0 10px 0; font-size:0.85rem; color:#64748b;">${data.challans.length} challan(s) found for <strong>${plate.toUpperCase()}</strong></p>
+                    <p style="margin:0 0 10px 0; font-size:0.85rem; color:var(--muted);">${data.challans.length} challan(s) found for <strong>${plate.toUpperCase()}</strong></p>
                     ${data.challans.length > 0 ? `
                     <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-                        <thead><tr style="background:#f1f5f9;">
+                        <thead><tr style="background:var(--section-bg);">
                             <th style="padding:6px;text-align:left;">Challan #</th>
                             <th style="padding:6px;text-align:left;">Violation</th>
                             <th style="padding:6px;text-align:left;">Fine</th>
@@ -129,6 +279,38 @@
                     </table>` : ''}
                 </div>`;
         }
+
+        // ── Audit log ─────────────────────────────────
+        async function loadAudit() {
+            const box = document.getElementById('audit-list');
+            box.innerHTML = '<div class="skel-bar"></div><div class="skel-bar" style="width:70%;"></div>';
+            try {
+                const res = await fetch('/api/audit-log?limit=15');
+                const data = await res.json();
+                if (!data.entries || data.entries.length === 0) {
+                    box.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);">No audit entries yet.</p>';
+                    return;
+                }
+                box.innerHTML = data.entries.map(e => `
+                    <div style="font-size:0.8rem; padding:8px 10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+                        <span><strong>${e.challan_number}</strong> · ${e.action} <span style="color:var(--muted);">by ${e.by}</span></span>
+                        <span style="color:var(--muted);">${e.timestamp}</span>
+                    </div>`).join('');
+            } catch (e) {
+                box.innerHTML = '<p style="color:#dc2626;font-size:0.85rem;">Failed to load audit log.</p>';
+            }
+        }
+
+        // ── Boot ──────────────────────────────────────
+        window.onload = function() {
+            applyTheme(localStorage.getItem('theme') || 'light');
+            applyLang(localStorage.getItem('lang') || 'en');
+            if (localStorage.getItem('officerToken')) {
+                showOfficerWorkspace();
+            } else {
+                showOfficerLogin();
+            }
+        };
     </script>
 </body>
 </html>

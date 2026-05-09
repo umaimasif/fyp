@@ -57,14 +57,41 @@
             font-size: 12px;
             color: #64748b;
         }
+        .paid-stamp {
+            color: #166534;
+            border: 6px solid #166534;
+            padding: 14px 40px;
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 6px;
+            text-align: center;
+            width: 200px;
+            margin: 20px auto;
+        }
+        .status-banner {
+            text-align: center;
+            padding: 8px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 20px;
+        }
+        .status-paid { background-color: #166534; }
+        .status-unpaid { background-color: #dc2626; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>OFFICIAL TRAFFIC CHALLAN</h1>
+        <h1>{% if status == "PAID" %}PAYMENT RECEIPT{% else %}OFFICIAL TRAFFIC CHALLAN{% endif %}</h1>
         <p>TrafficGuard Automated Enforcement System</p>
     </div>
+
+    {% if status == "PAID" %}
+        <div class="status-banner status-paid">✓ PAYMENT CONFIRMED</div>
+        <div class="paid-stamp">PAID</div>
+    {% else %}
+        <div class="status-banner status-unpaid">⚠ PAYMENT PENDING</div>
+    {% endif %}
 
     <table class="details-table">
         <tr>
@@ -89,11 +116,13 @@
         </tr>
     </table>
 
+    {% if violation_image %}
     <div class="evidence-section">
         <h3>AI Photographic Evidence</h3>
         <br>
         <img class="evidence-image" src="data:image/jpeg;base64,{{ violation_image }}" />
     </div>
+    {% endif %}
 
     <div class="footer">
         <p><strong>Note:</strong> Please clear your pending dues via the Citizen Portal within 10 days to avoid further legal action.</p>
