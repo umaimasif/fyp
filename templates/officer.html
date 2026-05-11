@@ -133,11 +133,17 @@
                 </div>
                 <div id="audit-list" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
             </div>
+
+            <!-- Authorized nav (only visible after officer login) -->
+            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; gap: 10px;">
+                <a href="/" style="flex:1; display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;" data-i18n="citizen_portal">← Citizen Portal</a>
+                <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">📊 <span data-i18n="statistics">Statistics</span></a>
+            </div>
         </div>
 
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; gap: 10px;">
-            <a href="/" style="flex:1; display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;" data-i18n="citizen_portal">← Citizen Portal</a>
-            <a href="/stats" style="flex:1; display: block; text-align: center; background: #0f172a; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;">📊 <span data-i18n="statistics">Statistics</span></a>
+        <!-- Logged-out nav (only Citizen Portal back-link) -->
+        <div id="officer-public-nav" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border);">
+            <a href="/" style="display: block; text-align: center; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;" data-i18n="citizen_portal">← Citizen Portal</a>
         </div>
     </div>
 
@@ -193,6 +199,7 @@
         function showOfficerWorkspace() {
             document.getElementById('officer-login').classList.add('hidden');
             document.getElementById('officer-workspace').classList.remove('hidden');
+            document.getElementById('officer-public-nav').style.display = 'none';
             document.getElementById('off-name').innerText = localStorage.getItem('officerName') || 'Officer';
             document.getElementById('off-badge').innerText = localStorage.getItem('officerBadge') || '';
             loadAudit();
@@ -201,6 +208,7 @@
         function showOfficerLogin() {
             document.getElementById('officer-login').classList.remove('hidden');
             document.getElementById('officer-workspace').classList.add('hidden');
+            document.getElementById('officer-public-nav').style.display = 'block';
         }
 
         async function officerLogin() {
