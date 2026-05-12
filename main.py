@@ -29,6 +29,10 @@ TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_NUM = os.getenv("TWILIO_PHONE_NUMBER")
 
+TWILIO_SID_2 = os.getenv("TWILIO_ACCOUNT_SID_2")
+TWILIO_AUTH_2 = os.getenv("TWILIO_AUTH_TOKEN_2")
+TWILIO_NUM_2 = os.getenv("TWILIO_PHONE_NUMBER_2")
+
 client = Groq(api_key=GROQ_API_KEY)
 
 # Robust MongoDB Connection
@@ -57,12 +61,42 @@ if officer_col is not None and officer_col.count_documents({}) == 0:
     })
     print("✅ Seeded default officer (officer / admin123)")
 
-# Twilio Setup
-twilio_client = None
-if TWILIO_SID and TWILIO_AUTH:
-    twilio_client = TwilioClient(TWILIO_SID, TWILIO_AUTH)
-else:
-    print("⚠️ WARNING: Twilio credentials not set. WhatsApp alerts disabled.")
+# Twilio Setup — primary + secondary fallback accounts
+twilio_clients = []  # list of (client, from_number, label)
+
+if TWILIO_SID and TWILIO_AUTH and TWILIO_NUM:
+    twilio_clients.append((TwilioClient(TWILIO_SID, TWILIO_AUTH), TWILIO_NUM, "primary"))
+    print("✅ Twilio primary account ready.")
+if TWILIO_SID_2 and TWILIO_AUTH_2 and TWILIO_NUM_2:
+    twilio_clients.append((TwilioClient(TWILIO_SID_2, TWILIO_AUTH_2), TWILIO_NUM_2, "secondary"))
+    print("✅ Twilio secondary (fallback) account ready.")
+if not twilio_clients:
+    print("⚠️ WARNING: No Twilio credentials set. WhatsApp alerts disabled.")
+
+# Backward-compat alias used by older code paths
+twilio_client = twilio_clients[0][0] if twilio_clients else None
+
+
+def send_whatsapp(to_phone: str, body: str) -> str:
+    """Send a WhatsApp message, trying each configured Twilio account in order.
+
+    Returns a human-readable status string for logging in `notification_status`.
+    """
+    if not twilio_clients:
+        return "WhatsApp disabled (no Twilio credentials)"
+    errors = []
+    for client, from_num, label in twilio_clients:
+        try:
+            client.messages.create(
+                from_=f"whatsapp:{from_num}",
+                body=body,
+                to=f"whatsapp:+{to_phone}",
+            )
+            return f"WhatsApp Sent via {label} ✅"
+        except Exception as e:
+            errors.append(f"{label}: {e}")
+            continue
+    return "WhatsApp Fail (all accounts): " + " | ".join(errors)
 
 otp_store = {}  # {nic: {"otp": "123456", "expires": unix_timestamp}}
 
@@ -389,18 +423,7 @@ async def process_video(request: Request, video: UploadFile = File(...)):
                 f"Fine: PKR {final_data['fine']}\n"
                 f"Please pay via App."
             )
-            if twilio_client and TWILIO_NUM:
-                try:
-                    twilio_client.messages.create(
-                        from_=f"whatsapp:{TWILIO_NUM}",
-                        body=msg,
-                        to=f"whatsapp:+{owner['phone']}" # Added the '+' for Twilio formatting
-                    )
-                    final_data['notification_status'] = "WhatsApp Sent ✅"
-                except Exception as e:
-                    final_data['notification_status'] = f"WhatsApp Fail: {str(e)}"
-            else:
-                final_data['notification_status'] = "WhatsApp disabled (no Twilio credentials)"
+            final_data['notification_status'] = send_whatsapp(owner['phone'], msg)
         else:
             final_data['notification_status'] = f"Owner not found for {final_plate}"
 
@@ -516,14 +539,12 @@ async def forgot_password(data: ForgotPasswordData):
     otp_store[data.nic] = {"otp": otp, "expires": time.time() + 300}
     msg = f"🔐 Your TrafficGuard OTP is: *{otp}*\nValid for 5 minutes. Do not share with anyone."
     phone = user.get("phone", "")
-    if twilio_client and TWILIO_NUM and phone:
-        try:
-            twilio_client.messages.create(from_=f"whatsapp:{TWILIO_NUM}", body=msg, to=f"whatsapp:+{phone}")
-            masked = phone[-4:].rjust(len(phone), '*')
-            return {"message": f"OTP sent to WhatsApp ending in {phone[-4:]}."}
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"message": f"Failed to send OTP: {str(e)}"})
-    return {"message": f"[DEV] OTP: {otp} (Twilio not configured)"}
+    if not phone or not twilio_clients:
+        return {"message": f"[DEV] OTP: {otp} (Twilio not configured)"}
+    status = send_whatsapp(phone, msg)
+    if status.startswith("WhatsApp Sent"):
+        return {"message": f"OTP sent to WhatsApp ending in {phone[-4:]}."}
+    return JSONResponse(status_code=500, content={"message": f"Failed to send OTP: {status}"})
 
 
 @app.post("/api/reset-password")
