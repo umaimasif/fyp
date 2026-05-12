@@ -15,7 +15,7 @@ owners_collection = db["owners"]
 owners_collection.drop() # Wipe old data for a clean slate
 owners_collection.create_index("nic", unique=True) 
 
-# Explicitly defined owners (8 Users Total)
+# Explicitly defined owners (9 Users Total)
 owners_data = [
     {
         "nic": "35202-1234567-1",
@@ -80,12 +80,20 @@ owners_data = [
         "password": "password123",
         "created_at": datetime.now(UTC),
         "vehicles": ["KHI1234", "AP20TV1199"]
+    },
+    {
+        "nic": "42101-8185864-0",
+        "name": "Marsha Arif",
+        "phone": "923320834282",
+        "password": "password123",
+        "created_at": datetime.now(UTC),
+        "vehicles": ["AP03BM2649"]
     }
 ]
 
 try:
     owners_collection.insert_many(owners_data, ordered=False)
-    print("✅ Dummy Owners inserted successfully (8 Users Total).")
+    print("✅ Dummy Owners inserted successfully (9 Users Total).")
 except errors.BulkWriteError:
     print("⚠️ Some owners already exist.")
 
@@ -171,4 +179,4 @@ try:
 except errors.BulkWriteError:
     print("⚠️ Some challans already existed.")
 
-print("🎉 Database has been successfully set up with 8 predictable users!")
+print("🎉 Database has been successfully set up with 9 predictable users!")
