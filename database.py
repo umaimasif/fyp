@@ -75,7 +75,7 @@ owners_data = [
     },
     {
         "nic": "42501-0725171-5",
-        "name": "Wajaht Tariq",
+        "name": "Wajahat Tariq",
         "phone": "923322307220",
         "password": "password123",
         "created_at": datetime.now(UTC),
