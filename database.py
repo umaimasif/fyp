@@ -79,7 +79,7 @@ owners_data = [
         "phone": "923322307220",
         "password": "password123",
         "created_at": datetime.now(UTC),
-        "vehicles": ["KHI1234"]
+        "vehicles": ["KHI1234", "AP20TV1199"]
     }
 ]
 
